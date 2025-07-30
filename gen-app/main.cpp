@@ -24,7 +24,7 @@ int main()
     const int server_socket = socket(AF_INET /* домен IPv4 */,
                                      SOCK_STREAM /* TCP */,
                                      0); /* TCP по умолчанию */
-    if (server_socket < 0)
+    if(server_socket < 0)
     {
         perror("[-] Server socket");
         return 1;
@@ -66,29 +66,29 @@ int main()
     char buf[4096]; // В этот буфер читаем входящие данные.
 
     // -------- Шаг 3. Главный цикл обработки событий. --------------------
-    while (true)
+    while(true)
     {
         // epoll_wait блокируется, пока не будет событий (‑1 = ждать бесконечно).
         int n = epoll_wait(epoll, evs, 64, -1);
-        if (n < 0)
+        if(n < 0)
         {
             perror("epoll_wait");
             break;
         }
 
         // Перебираем полученные события.
-        for (int i = 0; i < n; ++i)
+        for(int i = 0; i < n; ++i)
         {
             int fd = evs[i].data.fd; // Какой дескриптор «зафайрился».
 
             // ---- 3.1. Новые входящие соединения. ----
-            if (fd == server_socket)
+            if(fd == server_socket)
             {
                 // accept может принять несколько клиентов подряд.
-                while (true)
+                while(true)
                 {
                     int c = accept(server_socket, nullptr, nullptr); // Клиентский fd.
-                    if (c < 0) break; // -1 и errno==EAGAIN → очередь пуста.
+                    if(c < 0) break; // -1 и errno==EAGAIN → очередь пуста.
 
                     set_nonblock(c); // Делаем клиентский сокет неблокирующим.
 
@@ -103,7 +103,7 @@ int main()
             else
             {
                 // Читаем, пока есть данные.
-                while (recv(fd, buf, sizeof buf, 0) > 0)
+                while(recv(fd, buf, sizeof buf, 0) > 0)
                 {
                     /* Данные нам не нужны → отбрасываем. */
                 }
