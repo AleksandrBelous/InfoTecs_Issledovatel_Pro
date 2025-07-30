@@ -21,22 +21,22 @@ int set_nonblock(const int fd)
 int main()
 {
     // -------- Шаг 1. Создание «listening»‑сокета (серверного). ----------
-    const int ls = socket(AF_INET /* домен IPv4 */,
-                          SOCK_STREAM /* TCP */,
-                          0); /* TCP по умолчанию */
-    if(ls < 0)
+    const int server_socket = socket(AF_INET /* домен IPv4 */,
+                                     SOCK_STREAM /* TCP */,
+                                     0); /* TCP по умолчанию */
+    if (server_socket < 0)
     {
-        perror("socket");
+        perror("[-] Server socket");
         return 1;
     }
 
     // setsockopt(…, SO_REUSEADDR) позволяет сразу перезапускать программу,
     //  не ожидая, пока ядро освободит порт после предыдущего запуска.
     int yes = 1;
-    setsockopt(ls, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
+    setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
 
     // Переводим listening‑сокет в неблокирующий режим.
-    set_nonblock(ls);
+    set_nonblock(server_socket);
 
     // Заполняем структуру sockaddr_in для адреса 0.0.0.0:80.
     sockaddr_in addr{}; // Инициализируем нулями (C++20).
@@ -45,50 +45,50 @@ int main()
     addr.sin_port = htons(80); // htons – «host‑to‑network short»: переводим 80 в сетевой порядок байт.
 
     // Привязываем сокет к адресу/порту.
-    bind(ls, reinterpret_cast<sockaddr*>(&addr), sizeof addr);
+    bind(server_socket, reinterpret_cast<sockaddr*>(&addr), sizeof addr);
 
     // Помещаем сокет в состояние «слушать» (queue= SOMAXCONN – максимум для ОС).
-    listen(ls, SOMAXCONN);
+    listen(server_socket, SOMAXCONN);
 
     // -------- Шаг 2. Подготавливаем epoll для отслеживания событий. ------
-    int ep = epoll_create1(0); // 0 → без дополнительных флагов.
+    const int epoll = epoll_create1(0); // 0 → без дополнительных флагов.
 
     // epoll_event – структура для описания того, за какими событиями следим.
-    epoll_event ev{}; // Инициализируем нулями.
-    ev.events = EPOLLIN; // EPOLLIN → «дескриптор готов к чтению».
-    ev.data.fd = ls; // Кладём в поле data наш listening‑fd.
+    epoll_event ep_event{}; // Инициализируем нулями.
+    ep_event.events = EPOLLIN; // EPOLLIN → «дескриптор готов к чтению».
+    ep_event.data.fd = server_socket; // Кладём в поле data наш listening‑fd.
 
     // Регистрируем ls в epoll: ADD = добавить, &ev = с какими событиями.
-    epoll_ctl(ep, EPOLL_CTL_ADD, ls, &ev);
+    epoll_ctl(epoll, EPOLL_CTL_ADD, server_socket, &ep_event);
 
     // Массив для получаемых событий и буфер для чтения данных.
     epoll_event evs[64]; // За раз обрабатываем до 64 событий.
     char buf[4096]; // В этот буфер читаем входящие данные.
 
     // -------- Шаг 3. Главный цикл обработки событий. --------------------
-    for(;;)
+    while (true)
     {
         // epoll_wait блокируется, пока не будет событий (‑1 = ждать бесконечно).
-        int n = epoll_wait(ep, evs, 64, -1);
-        if(n < 0)
+        int n = epoll_wait(epoll, evs, 64, -1);
+        if (n < 0)
         {
             perror("epoll_wait");
             break;
         }
 
         // Перебираем полученные события.
-        for(int i = 0; i < n; ++i)
+        for (int i = 0; i < n; ++i)
         {
             int fd = evs[i].data.fd; // Какой дескриптор «зафайрился».
 
             // ---- 3.1. Новые входящие соединения. ----
-            if(fd == ls)
+            if (fd == server_socket)
             {
                 // accept может принять несколько клиентов подряд.
-                for(;;)
+                while (true)
                 {
-                    int c = accept(ls, nullptr, nullptr); // Клиентский fd.
-                    if(c < 0) break; // -1 и errno==EAGAIN → очередь пуста.
+                    int c = accept(server_socket, nullptr, nullptr); // Клиентский fd.
+                    if (c < 0) break; // -1 и errno==EAGAIN → очередь пуста.
 
                     set_nonblock(c); // Делаем клиентский сокет неблокирующим.
 
@@ -96,26 +96,26 @@ int main()
                     epoll_event c_ev{};
                     c_ev.events = EPOLLIN | EPOLLRDHUP;
                     c_ev.data.fd = c;
-                    epoll_ctl(ep, EPOLL_CTL_ADD, c, &c_ev);
+                    epoll_ctl(epoll, EPOLL_CTL_ADD, c, &c_ev);
                 }
             }
             // ---- 3.2. События на уже существующем клиентском сокете. ----
             else
             {
                 // Читаем, пока есть данные.
-                while(recv(fd, buf, sizeof buf, 0) > 0)
+                while (recv(fd, buf, sizeof buf, 0) > 0)
                 {
                     /* Данные нам не нужны → отбрасываем. */
                 }
                 // Удаляем дескриптор из epoll и закрываем.
-                epoll_ctl(ep, EPOLL_CTL_DEL, fd, nullptr);
+                epoll_ctl(epoll, EPOLL_CTL_DEL, fd, nullptr);
                 close(fd);
             }
         }
     }
 
     // Если главный цикл оборвался – закрываем ресурсы (на практике сюда не доходим).
-    close(ls);
-    close(ep);
+    close(server_socket);
+    close(epoll);
     return 0;
 }
