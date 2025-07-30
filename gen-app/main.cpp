@@ -115,7 +115,7 @@ int main()
     }
 
     // Если главный цикл оборвался – закрываем ресурсы (на практике сюда не доходим).
-    close(server_socket);
     close(epoll);
+    close(server_socket);
     return 0;
 }
