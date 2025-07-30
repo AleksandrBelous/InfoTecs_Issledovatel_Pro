@@ -1,15 +1,15 @@
-cmake_minimum_required(VERSION 3.31)
-
+cmake_minimum_required(VERSION 3.20)
 project(InfoTecs_Issledovatel_Pro LANGUAGES CXX)
 
-add_executable(InfoTecs_Issledovatel_Pro main.cpp)
+# Общие требования к компилятору для всех зависимых программ
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-set_target_properties(InfoTecs_Issledovatel_Pro PROPERTIES
-        CXX_STANDARD          20
-        CXX_STANDARD_REQUIRED YES
-        CXX_EXTENSIONS        NO
-)
+# Общие флаги диагностики и оптимизации
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    add_compile_options(-O2 -Wall -Wextra -pedantic)
+endif()
 
-target_compile_options(InfoTecs_Issledovatel_Pro PRIVATE
-        $<$<CXX_COMPILER_ID:GNU,Clang>:-O2 -Wall -Wextra -pedantic>
-)
+# Подкаталоги с отдельными программами
+add_subdirectory(gen-app)
