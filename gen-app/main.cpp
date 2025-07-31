@@ -15,6 +15,7 @@
 #include <cstring>       // strerror                             — строки ошибок
 #include <iostream>      // std::cout, std::cerr                 — вывод сообщений
 #include <ranges>
+#include <set>
 
 // ── 1. Утилита перевода дескриптора в неблокирующий режим ─────────────────────
 // Возвращает true при успехе, false при ошибке.
@@ -84,11 +85,12 @@ bool parseCmdLine(int argc, char* argv[], CmdOptions& opt)
         }
         else if(arg == "--connections" && i + 1 < argc)
         {
-            opt.connections = std::stoi(argv[++i]);
+            uint16_t connections = static_cast<uint16_t>(std::stoi(argv[++i]));
+            opt.connections = connections == 0 ? 1 : connections;
         }
         else if(arg == "--seed" && i + 1 < argc)
         {
-            opt.seed = std::stoi(argv[++i]);
+            opt.seed = static_cast<uint16_t>(std::stoi(argv[++i]));
         }
         else
         {
@@ -100,6 +102,11 @@ bool parseCmdLine(int argc, char* argv[], CmdOptions& opt)
     if(opt.mode.empty())
     {
         std::cerr << "[error] нужно указать --mode server|client\n";
+        return false;
+    }
+    if(opt.mode == "client" && opt.connections == 0)
+    {
+        std::cerr << "[error] должно быть хотя бы одно соединение --connections 1";
         return false;
     }
     if(opt.port == 0)
@@ -182,6 +189,8 @@ int runServer(const CmdOptions& opt)
     constexpr int MAX_EVENTS = 64;
     epoll_event events[MAX_EVENTS];
 
+    std::set<int> client_fds; // Множество для хранения client_fd
+
     // 4) Главный цикл
     while(running)
     {
@@ -209,6 +218,7 @@ int runServer(const CmdOptions& opt)
                         std::perror("accept");
                         break;
                     }
+
                     if(!setNonBlocking(client_fd))
                     {
                         close(client_fd);
@@ -223,6 +233,13 @@ int runServer(const CmdOptions& opt)
                         close(client_fd);
                         continue;
                     }
+
+                    client_fds.insert(client_fd);
+
+                    char ip[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &cliAddr.sin_addr, ip, sizeof(ip));
+                    std::cout << "[server] New connection from " <<
+                        ip << ":" << ntohs(cliAddr.sin_port) << " (fd=" << client_fd << ")\n";
                 }
             }
             else
@@ -262,6 +279,8 @@ int runServer(const CmdOptions& opt)
                 }
                 if(closeConn)
                 {
+                    client_fds.erase(fd);
+                    std::cout << "[server] Closed connection (fd=" << fd << ")\n";
                     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
                     close(fd);
                 }
@@ -270,6 +289,14 @@ int runServer(const CmdOptions& opt)
     }
 
     std::cout << "\n[server] Shutting down…\n";
+
+    for(int fd : client_fds)
+    {
+        std::cout << "[server] Closing remaining client (fd=" << fd << ")\n";
+        close(fd);
+    }
+    client_fds.clear();
+
     close(epoll_fd);
     close(listen_fd);
     return EXIT_SUCCESS;
