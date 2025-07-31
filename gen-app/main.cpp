@@ -49,6 +49,8 @@ struct CmdOptions
     std::string host = "0.0.0.0"; // по умолчанию — любой интерфейс
     uint16_t port = 0; // обязателен
     std::string mode; // "server" или "client"
+    uint16_t connections = 64; // число соединений
+    uint16_t seed = 42; // seed для ГСЧ
 };
 
 // ── 3. Простейший разбор argv ───────────────────────────────────────────────
@@ -66,7 +68,8 @@ bool parseCmdLine(int argc, char* argv[], CmdOptions& opt)
                 std::cerr << "[error] --addr требует host:port\n";
                 return false;
             }
-            opt.host = addr.substr(0, colon);
+            std::string host = addr.substr(0, colon);
+            opt.host = host == "localhost" ? "127.0.0.1" : host;
             int port = std::stoi(addr.substr(colon + 1));
             if(port <= 0 || port > 65535)
             {
@@ -78,6 +81,14 @@ bool parseCmdLine(int argc, char* argv[], CmdOptions& opt)
         else if(arg == "--mode" && i + 1 < argc)
         {
             opt.mode = argv[++i];
+        }
+        else if(arg == "--connections" && i + 1 < argc)
+        {
+            opt.connections = std::stoi(argv[++i]);
+        }
+        else if(arg == "--seed" && i + 1 < argc)
+        {
+            opt.seed = std::stoi(argv[++i]);
         }
         else
         {
