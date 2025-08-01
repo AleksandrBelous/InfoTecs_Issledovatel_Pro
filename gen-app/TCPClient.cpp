@@ -169,7 +169,7 @@ bool TCPClient::startConnection(Connection& conn)
     conn.fd = fd;
     conn.total_bytes = dist(rng_);
     conn.bytes_sent = 0;
-    conn.connecting = true;
+    conn.is_connecting = true;
 
     // Добавляем сокет в epoll для отслеживания событий подключения и записи
     if(!epoll_manager_->addFileDescriptor(fd, EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLRDHUP))
@@ -299,7 +299,7 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
     }
 
     // Если соединение еще подключается, проверяем статус подключения
-    if(conn.connecting)
+    if(conn.is_connecting)
     {
         int err = 0;
         socklen_t len = sizeof(err);
@@ -315,7 +315,7 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
             restartConnection(fd);
             return;
         }
-        conn.connecting = false;
+        conn.is_connecting = false;
         std::cout << "[client] Соединение установлено: fd=" << fd << "\n";
     }
 
@@ -323,7 +323,7 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
     if(events & EPOLLOUT)
     {
         // Дополнительная проверка состояния соединения перед отправкой
-        if(conn.connecting)
+        if(conn.is_connecting)
         {
             // Соединение еще не установлено, пропускаем отправку
             return;
