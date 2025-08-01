@@ -1,4 +1,4 @@
-// test2.cpp — серверная часть TCP/IPv4 приложения
+// main.cpp — серверная часть TCP/IPv4 приложения
 // Реализация в соответствии с заданием из Task.md, Часть 1
 
 #include <sys/epoll.h>      // epoll_create1, epoll_ctl, epoll_wait
@@ -8,12 +8,10 @@
 #include <unistd.h>         // close
 #include <csignal>          // signal, SIGINT
 #include <cstdlib>          // exit, EXIT_FAILURE, EXIT_SUCCESS
-#include <cstring>          // strerror, memset
 #include <iostream>         // std::cout, std::cerr
 #include <string>           // std::string
-#include <vector>           // std::vector
 #include <set>              // std::set
-#include <cerrno>          // errno, EAGAIN, EWOULDBLOCK, EINTR
+#include <cerrno>           // errno, EAGAIN, EWOULDBLOCK, EINTR
 
 // Глобальный флаг для корректного завершения по Ctrl-C
 volatile sig_atomic_t g_running = 1;
@@ -159,8 +157,7 @@ int createServerSocket(const ServerConfig& config)
     }
 
     // Настраиваем адрес сервера
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
+    struct sockaddr_in server_addr{}; // Zero-initialization в C++20
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(config.port);
 
@@ -172,7 +169,7 @@ int createServerSocket(const ServerConfig& config)
     }
 
     // Привязываем сокет к адресу
-    if(bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1)
+    if(bind(server_fd, reinterpret_cast<const struct sockaddr*>(&server_addr), sizeof(server_addr)) == -1)
     {
         std::perror("bind");
         close(server_fd);
@@ -206,8 +203,7 @@ int createEpollInstance()
 // Функция для добавления файлового дескриптора в epoll
 bool addToEpoll(int epoll_fd, int fd, uint32_t events)
 {
-    struct epoll_event ev;
-    memset(&ev, 0, sizeof(ev));
+    struct epoll_event ev{}; // Zero-initialization в C++20
     ev.events = events;
     ev.data.fd = fd;
 
@@ -236,11 +232,10 @@ void handleNewConnection(int server_fd, int epoll_fd, std::set<int>& client_fds)
 {
     while(true)
     {
-        struct sockaddr_in client_addr;
+        struct sockaddr_in client_addr{}; // Zero-initialization в C++20
         socklen_t client_addr_len = sizeof(client_addr);
-        memset(&client_addr, 0, client_addr_len);
 
-        int client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_addr_len);
+        int client_fd = accept(server_fd, reinterpret_cast<struct sockaddr*>(&client_addr), &client_addr_len);
         if(client_fd == -1)
         {
             if(errno == EAGAIN || errno == EWOULDBLOCK)
@@ -328,7 +323,7 @@ void handleClientData(int client_fd, int epoll_fd, std::set<int>& client_fds)
 // Функция для обработки событий epoll
 void handleEpollEvents(int epoll_fd, int server_fd, std::set<int>& client_fds)
 {
-    const int MAX_EVENTS = 64;
+    constexpr int MAX_EVENTS = 64;
     struct epoll_event events[MAX_EVENTS];
 
     int num_events = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
