@@ -216,7 +216,11 @@ void TCPServer::handleEpollEvents()
     {
         if(errno == EINTR)
         {
-            // Прервано сигналом - это нормально
+            // Прервано сигналом - проверяем, нужно ли завершить работу
+            if(!running_)
+            {
+                return; // Выходим из цикла, shutdown() будет вызван в run()
+            }
             return;
         }
         std::perror("epoll_wait");

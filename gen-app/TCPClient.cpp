@@ -130,6 +130,8 @@ bool TCPClient::startConnection(Connection& conn)
     int fd = SocketManager::createClientSocket(config_.host, config_.port);
     if(fd == -1)
     {
+        std::cerr << "[error] Не удалось создать сокет для подключения к "
+            << config_.host << ":" << config_.port << "\n";
         return false;
     }
 
@@ -143,6 +145,7 @@ bool TCPClient::startConnection(Connection& conn)
     // Добавляем сокет в epoll для отслеживания событий подключения и записи
     if(!epoll_manager_->addFileDescriptor(fd, EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLRDHUP))
     {
+        std::cerr << "[error] Не удалось добавить сокет в epoll: fd=" << fd << "\n";
         SocketManager::closeSocket(fd);
         return false;
     }
@@ -186,6 +189,14 @@ void TCPClient::restartConnection(int fd)
     else
     {
         std::cerr << "[error] Не удалось пересоздать соединение\n";
+        // Если не удается создать соединение, возможно сервер недоступен
+        // Проверяем, есть ли еще активные соединения
+        if(connections_.empty())
+        {
+            std::cerr << "[error] Нет активных соединений. Сервер может быть недоступен.\n";
+            std::cerr << "[error] Завершение работы клиента.\n";
+            running_ = 0;
+        }
     }
 }
 
@@ -230,6 +241,7 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
     // Проверяем ошибки соединения
     if(events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
     {
+        std::cout << "[client] Соединение разорвано сервером: fd=" << fd << "\n";
         restartConnection(fd);
         return;
     }
@@ -242,6 +254,12 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
         if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
         {
             std::cerr << "[error] Ошибка подключения (fd=" << fd << "): " << strerror(err) << "\n";
+            if(err == ECONNREFUSED)
+            {
+                std::cerr << "[error] Сервер недоступен. Завершение работы клиента.\n";
+                running_ = 0;
+                return;
+            }
             restartConnection(fd);
             return;
         }
@@ -271,6 +289,13 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
                 {
                     // Буфер отправки заполнен, попробуем позже
                     break;
+                }
+                else if(errno == EPIPE || errno == ECONNRESET)
+                {
+                    // Соединение разорвано сервером
+                    std::cout << "[client] Соединение разорвано сервером при отправке: fd=" << fd << "\n";
+                    restartConnection(fd);
+                    return;
                 }
                 std::perror("send");
                 restartConnection(fd);
