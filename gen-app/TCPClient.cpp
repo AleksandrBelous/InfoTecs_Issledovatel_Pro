@@ -163,6 +163,7 @@ bool TCPClient::startConnection(Connection& conn)
             << config_.host << ":" << config_.port << "\n";
         return false;
     }
+
     // Если не удается создать соединение, проверяем доступность сервера
     // Проверяем статус подключения
     int err = 0;
@@ -176,7 +177,7 @@ bool TCPClient::startConnection(Connection& conn)
             running_ = 0;
         }
     }
-    SocketManager::closeSocket(fd);
+
 
     // Генерируем случайное количество байт для отправки (32-1024 байта)
     std::uniform_int_distribution<size_t> dist(32, 1024);
