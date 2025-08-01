@@ -163,6 +163,20 @@ bool TCPClient::startConnection(Connection& conn)
             << config_.host << ":" << config_.port << "\n";
         return false;
     }
+    // Если не удается создать соединение, проверяем доступность сервера
+    // Проверяем статус подключения
+    int err = 0;
+    socklen_t len = sizeof(err);
+    if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
+    {
+        if(err == ECONNREFUSED)
+        {
+            std::cerr << "[error] Сервер недоступен. Завершение работы клиента.\n";
+            SocketManager::closeSocket(fd);
+            running_ = 0;
+        }
+    }
+    SocketManager::closeSocket(fd);
 
     // Генерируем случайное количество байт для отправки (32-1024 байта)
     std::uniform_int_distribution<size_t> dist(32, 1024);
