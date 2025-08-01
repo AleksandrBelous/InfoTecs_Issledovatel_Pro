@@ -9,7 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Общие флаги диагностики и оптимизации
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_compile_options(-O2 -Wall -Wextra -pedantic)
-endif()
+endif ()
 
 # Подкаталоги с отдельными программами
 add_subdirectory(gen-app)
