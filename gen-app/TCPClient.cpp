@@ -7,8 +7,10 @@
 #include <iostream>
 #include <unistd.h>
 #include <cerrno>
+#include <cstring>
 #include <ranges>
 
+// Глобальный указатель на клиент для обработчика сигналов
 static TCPClient* g_client_instance = nullptr;
 
 TCPClient::TCPClient(ClientConfig config)
@@ -28,29 +30,32 @@ TCPClient::~TCPClient()
 
 bool TCPClient::initialize()
 {
+    // Инициализируем epoll
     if(!epoll_manager_->initialize())
     {
+        std::cerr << "[error] Не удалось инициализировать epoll\n";
         return false;
     }
 
+    // Устанавливаем обработчик сигнала SIGINT
     g_client_instance = this;
     signal(SIGINT, signalHandler);
 
+    // Создаем начальные соединения
     for(size_t i = 0; i < config_.connections; ++i)
     {
         Connection conn;
-        if(startConnection(conn))
+        if(!startConnection(conn))
         {
-            connections_.emplace(conn.fd, conn);
-        }
-        else
-        {
+            std::cerr << "[error] Не удалось создать соединение " << (i + 1) << "\n";
             return false;
         }
+        connections_.emplace(conn.fd, conn);
     }
 
     checkConnectionCount();
 
+    std::cout << "[client] Инициализирован клиент: " << config_.toString() << "\n";
     std::cout << "[client] Создано соединений: " << connections_.size()
         << " к " << config_.host << ':' << config_.port
         << " (Ctrl-C для завершения)" << std::endl;
@@ -59,62 +64,97 @@ bool TCPClient::initialize()
 
 void TCPClient::run()
 {
+    if(!isRunning())
+    {
+        std::cerr << "[error] Клиент не инициализирован\n";
+        return;
+    }
+
+    // Главный цикл клиента
     while(running_)
     {
         handleEpollEvents();
     }
+
     shutdown();
 }
 
 void TCPClient::shutdown()
 {
     running_ = 0;
-    // for(auto& [fd, conn] : connections_)
+    std::cout << "[client] Завершение работы клиента...\n";
+
+    // Закрываем все соединения
     for(const auto& fd : connections_ | std::views::keys)
     {
+        std::cout << "[client] Закрываю соединение (fd=" << fd << ")\n";
         (void)epoll_manager_->removeFileDescriptor(fd);
         SocketManager::closeSocket(fd);
     }
     connections_.clear();
+
+    std::cout << "[client] Клиент остановлен\n";
 }
 
-void TCPClient::signalHandler(int /*signum*/)
+std::string TCPClient::getStats() const
 {
+    size_t total_bytes_to_send = 0;
+    size_t total_bytes_sent = 0;
+
+    for(const auto& [fd, conn] : connections_)
+    {
+        total_bytes_to_send += conn.total_bytes;
+        total_bytes_sent += conn.bytes_sent;
+    }
+
+    return "Активных соединений: " + std::to_string(connections_.size()) +
+        "/" + std::to_string(config_.connections) +
+        ", Отправлено байт: " + std::to_string(total_bytes_sent) +
+        "/" + std::to_string(total_bytes_to_send);
+}
+
+void TCPClient::signalHandler(int signum)
+{
+    (void)signum; // Подавляем предупреждение о неиспользуемом параметре
+
     if(g_client_instance)
     {
         g_client_instance->running_ = 0;
-        std::cout << "\n[client] Завершение работы..." << std::endl;
+        std::cout << "\n[client] Получен сигнал завершения, закрываю соединения...\n";
     }
 }
 
 bool TCPClient::startConnection(Connection& conn)
 {
+    // Создаем клиентский сокет и инициируем подключение
     int fd = SocketManager::createClientSocket(config_.host, config_.port);
     if(fd == -1)
     {
         return false;
     }
 
+    // Генерируем случайное количество байт для отправки (32-1024 байта)
     std::uniform_int_distribution<size_t> dist(32, 1024);
     conn.fd = fd;
     conn.total_bytes = dist(rng_);
     conn.bytes_sent = 0;
     conn.connecting = true;
 
+    // Добавляем сокет в epoll для отслеживания событий подключения и записи
     if(!epoll_manager_->addFileDescriptor(fd, EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLRDHUP))
     {
         SocketManager::closeSocket(fd);
         return false;
     }
-    std::cout << "[client] Открыто соединение: fd=" << fd << '\n';
+
+    std::cout << "[client] Открыто соединение: fd=" << fd
+        << " (будет отправлено " << conn.total_bytes << " байт)\n";
     return true;
 }
 
 void TCPClient::checkConnectionCount()
 {
-    std::cout << "In checkConnectionCount()" << std::endl;
-    std::cout << "last_connection_count_ = " << last_connection_count_ << std::endl;
-    std::cout << "connections_.size() = " << connections_.size() << std::endl;
+    // Выводим информацию об изменении количества соединений
     if(last_connection_count_ != connections_.size())
     {
         last_connection_count_ = connections_.size();
@@ -130,16 +170,22 @@ void TCPClient::restartConnection(int fd)
     {
         return;
     }
+
     std::cout << "[client] Закрыто соединение: fd=" << fd << '\n';
     (void)epoll_manager_->removeFileDescriptor(fd);
     SocketManager::closeSocket(fd);
     connections_.erase(it);
 
+    // Создаем новое соединение для поддержания постоянного количества
     Connection conn;
     if(startConnection(conn))
     {
         connections_.emplace(conn.fd, conn);
         checkConnectionCount();
+    }
+    else
+    {
+        std::cerr << "[error] Не удалось пересоздать соединение\n";
     }
 }
 
@@ -148,11 +194,13 @@ void TCPClient::handleEpollEvents()
     constexpr int MAX_EVENTS = 64;
     struct epoll_event events[MAX_EVENTS];
 
-    int num = epoll_manager_->waitForEvents(events, MAX_EVENTS, -1);
-    if(num == -1)
+    // Ожидаем события от epoll
+    int num_events = epoll_manager_->waitForEvents(events, MAX_EVENTS, -1);
+    if(num_events == -1)
     {
         if(errno == EINTR)
         {
+            // Прервано сигналом - это нормально
             return;
         }
         std::perror("epoll_wait");
@@ -160,7 +208,8 @@ void TCPClient::handleEpollEvents()
         return;
     }
 
-    for(int i = 0; i < num; ++i)
+    // Обрабатываем все полученные события
+    for(int i = 0; i < num_events; ++i)
     {
         handleConnectionEvent(events[i].data.fd, events[i].events);
     }
@@ -178,47 +227,62 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
 
     Connection& conn = it->second;
 
+    // Проверяем ошибки соединения
     if(events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
     {
         restartConnection(fd);
         return;
     }
 
+    // Если соединение еще подключается, проверяем статус подключения
     if(conn.connecting)
     {
         int err = 0;
         socklen_t len = sizeof(err);
         if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
         {
+            std::cerr << "[error] Ошибка подключения (fd=" << fd << "): " << strerror(err) << "\n";
             restartConnection(fd);
             return;
         }
         conn.connecting = false;
+        std::cout << "[client] Соединение установлено: fd=" << fd << "\n";
     }
 
+    // Если сокет готов к записи, отправляем данные
     if(events & EPOLLOUT)
     {
+        // Статический буфер с нулями для отправки
         static constexpr char data[1024] = {};
+
+        // Отправляем данные порциями
         while(conn.bytes_sent < conn.total_bytes)
         {
             size_t to_send = std::min(sizeof(data), conn.total_bytes - conn.bytes_sent);
-            ssize_t n = SocketManager::sendData(fd, data, to_send);
-            if(n > 0)
+            ssize_t bytes_sent = SocketManager::sendData(fd, data, to_send);
+
+            if(bytes_sent > 0)
             {
-                conn.bytes_sent += static_cast<size_t>(n);
+                conn.bytes_sent += static_cast<size_t>(bytes_sent);
             }
-            else if(n == -1)
+            else if(bytes_sent == -1)
             {
                 if(errno == EAGAIN || errno == EWOULDBLOCK)
                 {
+                    // Буфер отправки заполнен, попробуем позже
                     break;
                 }
+                std::perror("send");
                 restartConnection(fd);
                 return;
             }
         }
+
+        // Если все данные отправлены, закрываем соединение
         if(conn.bytes_sent >= conn.total_bytes)
         {
+            std::cout << "[client] Данные отправлены: fd=" << fd
+                << " (" << conn.bytes_sent << "/" << conn.total_bytes << " байт)\n";
             restartConnection(fd);
         }
     }

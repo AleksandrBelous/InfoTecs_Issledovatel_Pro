@@ -69,7 +69,24 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
     {
         std::string arg = argv[i];
 
-        if(arg == "--addr" && i + 1 < argc)
+        if(arg == "--help" || arg == "-h")
+        {
+            std::cout << "Использование: " << argv[0] <<
+                " --addr host:port --mode server|client [--connections N --seed S]\n";
+            std::cout << "\nОпции:\n";
+            std::cout << "  --addr host:port    Адрес и порт сервера (обязательно)\n";
+            std::cout << "  --mode server|client Режим работы (обязательно)\n";
+            std::cout <<
+                "  --connections N     Количество параллельных соединений (только для клиента, по умолчанию 1)\n";
+            std::cout <<
+                "  --seed S            Зерно для генератора случайных чисел (только для клиента, по умолчанию 1)\n";
+            std::cout << "  --help, -h          Показать эту справку\n";
+            std::cout << "\nПримеры:\n";
+            std::cout << "  " << argv[0] << " --addr localhost:8000 --mode server\n";
+            std::cout << "  " << argv[0] << " --addr localhost:8000 --mode client --connections 512 --seed 1337\n";
+            return false; // Завершаем программу после вывода справки
+        }
+        else if(arg == "--addr" && i + 1 < argc)
         {
             if(!parseAddress(argv[++i], server_config))
             {
@@ -102,6 +119,7 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
         else
         {
             std::cerr << "[error] Неизвестный аргумент: " << arg << "\n";
+            std::cerr << "Используйте --help для получения справки\n";
             return false;
         }
     }
@@ -160,18 +178,25 @@ int runClient(const ClientConfig& config)
 {
     try
     {
+        // Создаем и инициализируем клиент
         TCPClient client(config);
+
         if(!client.initialize())
         {
             std::cerr << "[error] Не удалось инициализировать клиент\n";
+            std::cerr << "[error] Проверьте доступность сервера: "
+                << config.host << ":" << config.port << "\n";
             return EXIT_FAILURE;
         }
+
+        // Запускаем основной цикл клиента
         client.run();
+
         return EXIT_SUCCESS;
     }
     catch(const std::exception& e)
     {
-        std::cerr << "[error] Исключение: " << e.what() << "\n";
+        std::cerr << "[error] Исключение в клиенте: " << e.what() << "\n";
         return EXIT_FAILURE;
     }
 }
@@ -191,10 +216,7 @@ int main(int argc, char* argv[])
     // Разбираем аргументы командной строки
     if(!parseCommandLine(argc, argv, mode, sconfig, cconfig))
     {
-        std::cerr << "Использование: " << argv[0] <<
-            " --addr host:port --mode server|client [--connections N --seed S]\n";
-        std::cerr << "Пример: " << argv[0] << " --addr localhost:8000 --mode server\n";
-        return EXIT_FAILURE;
+        return EXIT_FAILURE; // Завершаем программу после вывода справки
     }
 
     // Запускаем сервер или клиент
