@@ -7,6 +7,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <cerrno>
+#include <ranges>
 
 static TCPClient* g_client_instance = nullptr;
 
@@ -66,7 +67,8 @@ void TCPClient::run()
 void TCPClient::shutdown()
 {
     running_ = 0;
-    for(auto& [fd, conn] : connections_)
+    // for(auto& [fd, conn] : connections_)
+    for(const auto& fd : connections_ | std::views::keys)
     {
         (void)epoll_manager_->removeFileDescriptor(fd);
         SocketManager::closeSocket(fd);
@@ -119,7 +121,7 @@ void TCPClient::restartConnection(int fd)
     Connection conn;
     if(startConnection(conn))
     {
-        connections_.emplace(conn.fd, std::move(conn));
+        connections_.emplace(conn.fd, conn);
     }
 }
 
@@ -176,7 +178,7 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
 
     if(events & EPOLLOUT)
     {
-        static const char data[1024] = {};
+        static constexpr char data[1024] = {};
         while(conn.bytes_sent < conn.total_bytes)
         {
             size_t to_send = std::min(sizeof(data), conn.total_bytes - conn.bytes_sent);
