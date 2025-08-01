@@ -16,12 +16,15 @@ static TCPServer* g_server_instance = nullptr;
 TCPServer::TCPServer(ServerConfig config)
     : config_(std::move(config))
       , epoll_manager_(std::make_unique<EpollManager>())
-      , running_(1)
 {
 }
 
 TCPServer::~TCPServer()
 {
+    if(!running_)
+    {
+        return; // Уже завершается
+    }
     shutdown();
 }
 
@@ -77,11 +80,6 @@ void TCPServer::run()
 
 void TCPServer::shutdown()
 {
-    if(!running_)
-    {
-        return; // Уже завершается
-    }
-
     running_ = 0;
     std::cout << "[server] Завершение работы сервера...\n";
 
