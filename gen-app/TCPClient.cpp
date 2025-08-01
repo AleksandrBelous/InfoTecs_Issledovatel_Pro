@@ -49,6 +49,8 @@ bool TCPClient::initialize()
         }
     }
 
+    checkConnectionCount();
+
     std::cout << "[client] Создано соединений: " << connections_.size()
         << " к " << config_.host << ':' << config_.port
         << " (Ctrl-C для завершения)" << std::endl;
@@ -107,6 +109,19 @@ bool TCPClient::startConnection(Connection& conn)
     return true;
 }
 
+void TCPClient::checkConnectionCount()
+{
+    std::cout << "In checkConnectionCount()" << std::endl;
+    std::cout << "last_connection_count_ = " << last_connection_count_ << std::endl;
+    std::cout << "connections_.size() = " << connections_.size() << std::endl;
+    if(last_connection_count_ != connections_.size())
+    {
+        last_connection_count_ = connections_.size();
+        std::cout << "[client] Активных соединений: " << last_connection_count_
+            << "/" << config_.connections << std::endl;
+    }
+}
+
 void TCPClient::restartConnection(int fd)
 {
     auto it = connections_.find(fd);
@@ -122,6 +137,7 @@ void TCPClient::restartConnection(int fd)
     if(startConnection(conn))
     {
         connections_.emplace(conn.fd, conn);
+        checkConnectionCount();
     }
 }
 
@@ -146,6 +162,8 @@ void TCPClient::handleEpollEvents()
     {
         handleConnectionEvent(events[i].data.fd, events[i].events);
     }
+
+    checkConnectionCount();
 }
 
 void TCPClient::handleConnectionEvent(int fd, uint32_t events)

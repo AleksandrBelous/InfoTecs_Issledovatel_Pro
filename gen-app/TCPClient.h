@@ -44,10 +44,12 @@ private:
     void restartConnection(int fd);
     void handleEpollEvents();
     void handleConnectionEvent(int fd, uint32_t events);
+    void checkConnectionCount();
 
     ClientConfig config_;
     std::unique_ptr<EpollManager> epoll_manager_;
     std::unordered_map<int, Connection> connections_;
     std::mt19937 rng_;
+    size_t last_connection_count_ = 0;
     volatile sig_atomic_t running_ = 1;
 };
