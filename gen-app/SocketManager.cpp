@@ -62,6 +62,45 @@ int SocketManager::createServerSocket(const std::string& host, uint16_t port)
     return server_fd;
 }
 
+int SocketManager::createClientSocket(const std::string& host, uint16_t port)
+{
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(fd == -1)
+    {
+        std::perror("socket");
+        return -1;
+    }
+
+    if(!setNonBlocking(fd))
+    {
+        closeSocket(fd);
+        return -1;
+    }
+
+    struct sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    if(inet_pton(AF_INET, host.c_str(), &addr.sin_addr) != 1)
+    {
+        std::cerr << "[error] Некорректный IP-адрес: " << host << "\n";
+        closeSocket(fd);
+        return -1;
+    }
+
+    if(connect(fd, reinterpret_cast<const struct sockaddr*>(&addr), sizeof(addr)) == -1)
+    {
+        if(errno != EINPROGRESS)
+        {
+            std::perror("connect");
+            closeSocket(fd);
+            return -1;
+        }
+    }
+
+    return fd;
+}
+
 bool SocketManager::setNonBlocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -91,6 +130,11 @@ void SocketManager::closeSocket(int fd)
 int SocketManager::acceptConnection(int server_fd, struct sockaddr_in* client_addr, socklen_t* addr_len)
 {
     return accept(server_fd, reinterpret_cast<struct sockaddr*>(client_addr), addr_len);
+}
+
+ssize_t SocketManager::sendData(int fd, const char* buffer, size_t buffer_size)
+{
+    return send(fd, buffer, buffer_size, 0);
 }
 
 ssize_t SocketManager::receiveData(int fd, char* buffer, size_t buffer_size)

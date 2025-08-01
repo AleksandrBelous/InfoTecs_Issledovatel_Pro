@@ -4,6 +4,7 @@ add_executable(gen-app
         TCPServer.cpp
         SocketManager.cpp
         EpollManager.cpp
+        TCPClient.cpp
 )
 
 # Привязка библиотек

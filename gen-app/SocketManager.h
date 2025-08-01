@@ -46,6 +46,14 @@ public:
     [[nodiscard]] static int createServerSocket(const std::string& host, uint16_t port);
 
     /**
+     * @brief Создание клиентского сокета и инициирование подключения
+     * @param host IP-адрес сервера
+     * @param port Порт сервера
+     * @return Файловый дескриптор сокета или -1 при ошибке
+     */
+    [[nodiscard]] static int createClientSocket(const std::string& host, uint16_t port);
+
+    /**
      * @brief Перевод сокета в неблокирующий режим
      * @param fd Файловый дескриптор
      * @return true при успехе
@@ -66,6 +74,15 @@ public:
      * @return Файловый дескриптор клиентского сокета или -1 при ошибке
      */
     [[nodiscard]] static int acceptConnection(int server_fd, struct sockaddr_in* client_addr, socklen_t* addr_len);
+
+    /**
+     * @brief Отправка данных в сокет
+     * @param fd Файловый дескриптор
+     * @param buffer Буфер с данными
+     * @param buffer_size Размер буфера
+     * @return Количество отправленных байт или -1 при ошибке
+     */
+    [[nodiscard]] static ssize_t sendData(int fd, const char* buffer, size_t buffer_size);
 
     /**
      * @brief Чтение данных из сокета

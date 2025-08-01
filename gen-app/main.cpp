@@ -2,6 +2,8 @@
 
 #include "TCPServer.h"
 #include "ServerConfig.h"
+#include "TCPClient.h"
+#include "ClientConfig.h"
 #include <iostream>
 #include <cstdlib>
 #include <string>
@@ -55,10 +57,13 @@ bool parseAddress(const std::string& addr, ServerConfig& config)
  * @brief Разбор аргументов командной строки
  * @param argc Количество аргументов
  * @param argv Массив аргументов
- * @param config Конфигурация для заполнения
+ * @param mode Режим server | client
+ * @param server_config Конфигурация для сервера
+ * @param client_config Конфигурация для клиента
  * @return true при успешном разборе
  */
-bool parseCommandLine(int argc, char* argv[], ServerConfig& config)
+bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& server_config,
+                      ClientConfig& client_config)
 {
     for(int i = 1; i < argc; ++i)
     {
@@ -66,19 +71,33 @@ bool parseCommandLine(int argc, char* argv[], ServerConfig& config)
 
         if(arg == "--addr" && i + 1 < argc)
         {
-            if(!parseAddress(argv[++i], config))
+            if(!parseAddress(argv[++i], server_config))
             {
                 return false;
             }
+            client_config.host = server_config.getHost();
+            client_config.port = server_config.getPort();
         }
         else if(arg == "--mode" && i + 1 < argc)
         {
-            std::string mode = argv[++i];
-            if(mode != "server")
+            mode = argv[++i];
+            if(mode != "server" && mode != "client")
             {
-                std::cerr << "[error] Поддерживается только режим server\n";
+                std::cerr << "[error] Поддерживаются режимы server или client\n";
                 return false;
             }
+        }
+        else if(arg == "--connections" && i + 1 < argc)
+        {
+            client_config.connections = std::stoul(argv[++i]);
+            if(client_config.connections == 0)
+            {
+                client_config.connections = 1;
+            }
+        }
+        else if(arg == "--seed" && i + 1 < argc)
+        {
+            client_config.seed = static_cast<uint32_t>(std::stoul(argv[++i]));
         }
         else
         {
@@ -87,9 +106,15 @@ bool parseCommandLine(int argc, char* argv[], ServerConfig& config)
         }
     }
 
-    if(!config.isValid())
+    if(!server_config.isValid())
     {
         std::cerr << "[error] Необходимо указать адрес и порт: --addr host:port\n";
+        return false;
+    }
+
+    if(mode == "client" && !client_config.isValid())
+    {
+        std::cerr << "[error] Неверные параметры клиента\n";
         return false;
     }
 
@@ -127,6 +152,31 @@ int runServer(const ServerConfig& config)
 }
 
 /**
+ * @brief Запуск клиента
+ * @param config Конфигурация клиента
+ * @return Код возврата
+ */
+int runClient(const ClientConfig& config)
+{
+    try
+    {
+        TCPClient client(config);
+        if(!client.initialize())
+        {
+            std::cerr << "[error] Не удалось инициализировать клиент\n";
+            return EXIT_FAILURE;
+        }
+        client.run();
+        return EXIT_SUCCESS;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "[error] Исключение: " << e.what() << "\n";
+        return EXIT_FAILURE;
+    }
+}
+
+/**
  * @brief Точка входа в программу
  * @param argc Количество аргументов командной строки
  * @param argv Массив аргументов командной строки
@@ -134,16 +184,23 @@ int runServer(const ServerConfig& config)
  */
 int main(int argc, char* argv[])
 {
-    ServerConfig config;
+    ServerConfig sconfig;
+    ClientConfig cconfig;
+    std::string mode;
 
     // Разбираем аргументы командной строки
-    if(!parseCommandLine(argc, argv, config))
+    if(!parseCommandLine(argc, argv, mode, sconfig, cconfig))
     {
-        std::cerr << "Использование: " << argv[0] << " --addr host:port --mode server\n";
+        std::cerr << "Использование: " << argv[0] <<
+            " --addr host:port --mode server|client [--connections N --seed S]\n";
         std::cerr << "Пример: " << argv[0] << " --addr localhost:8000 --mode server\n";
         return EXIT_FAILURE;
     }
 
-    // Запускаем сервер
-    return runServer(config);
+    // Запускаем сервер или клиент
+    if(mode == "server")
+    {
+        return runServer(sconfig);
+    }
+    return runClient(cconfig);
 }
