@@ -48,7 +48,7 @@ bool EpollManager::initialize()
     return true;
 }
 
-bool EpollManager::addFileDescriptor(const int fd, const uint32_t events)
+bool EpollManager::addFileDescriptor(const int fd, const uint32_t events) const
 {
     struct epoll_event ev{};
     ev.events = events;
@@ -63,7 +63,7 @@ bool EpollManager::addFileDescriptor(const int fd, const uint32_t events)
     return true;
 }
 
-bool EpollManager::removeFileDescriptor(const int fd)
+bool EpollManager::removeFileDescriptor(const int fd) const
 {
     if(epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, nullptr) == -1)
     {
@@ -73,7 +73,7 @@ bool EpollManager::removeFileDescriptor(const int fd)
     return true;
 }
 
-int EpollManager::waitForEvents(struct epoll_event* events, const int max_events, const int timeout)
+int EpollManager::waitForEvents(struct epoll_event* events, const int max_events, const int timeout) const
 {
     return epoll_wait(epoll_fd_, events, max_events, timeout);
 }

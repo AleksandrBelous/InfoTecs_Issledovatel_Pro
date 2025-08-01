@@ -47,14 +47,14 @@ public:
      * @param events Маска событий
      * @return true при успехе
      */
-    [[nodiscard]] bool addFileDescriptor(int fd, uint32_t events);
+    [[nodiscard]] bool addFileDescriptor(int fd, uint32_t events) const;
 
     /**
      * @brief Удаление файлового дескриптора из epoll
      * @param fd Файловый дескриптор
      * @return true при успехе
      */
-    [[nodiscard]] bool removeFileDescriptor(int fd);
+    [[nodiscard]] bool removeFileDescriptor(int fd) const;
 
     /**
      * @brief Ожидание событий
@@ -63,7 +63,7 @@ public:
      * @param timeout Таймаут в миллисекундах (-1 для бесконечного ожидания)
      * @return Количество произошедших событий или -1 при ошибке
      */
-    [[nodiscard]] int waitForEvents(struct epoll_event* events, int max_events, int timeout = -1);
+    [[nodiscard]] int waitForEvents(struct epoll_event* events, int max_events, int timeout = -1) const;
 
     /**
      * @brief Проверка валидности epoll-инстанса
