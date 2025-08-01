@@ -40,7 +40,7 @@ bool TCPClient::initialize()
         Connection conn;
         if(startConnection(conn))
         {
-            connections_.emplace(conn.fd, std::move(conn));
+            connections_.emplace(conn.fd, conn);
         }
         else
         {
