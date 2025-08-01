@@ -106,6 +106,7 @@ bool TCPClient::startConnection(Connection& conn)
         SocketManager::closeSocket(fd);
         return false;
     }
+    std::cout << "[client] Открыто соединение: fd=" << fd << '\n';
     return true;
 }
 
@@ -129,6 +130,7 @@ void TCPClient::restartConnection(int fd)
     {
         return;
     }
+    std::cout << "[client] Закрыто соединение: fd=" << fd << '\n';
     (void)epoll_manager_->removeFileDescriptor(fd);
     SocketManager::closeSocket(fd);
     connections_.erase(it);
