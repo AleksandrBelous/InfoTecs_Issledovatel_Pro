@@ -41,6 +41,28 @@ bool TCPClient::initialize()
     g_client_instance = this;
     signal(SIGINT, signalHandler);
 
+    // Проверяем доступность сервера перед созданием соединений
+    int test_fd = SocketManager::createClientSocket(config_.host, config_.port);
+    if(test_fd == -1)
+    {
+        std::cerr << "[error] Сервер недоступен: " << config_.host << ":" << config_.port << "\n";
+        return false;
+    }
+
+    // Проверяем статус подключения
+    int err = 0;
+    socklen_t len = sizeof(err);
+    if(getsockopt(test_fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
+    {
+        if(err == ECONNREFUSED)
+        {
+            std::cerr << "[error] Сервер недоступен: " << config_.host << ":" << config_.port << "\n";
+            SocketManager::closeSocket(test_fd);
+            return false;
+        }
+    }
+    SocketManager::closeSocket(test_fd);
+
     // Создаем начальные соединения
     for(size_t i = 0; i < config_.connections; ++i)
     {
@@ -81,6 +103,11 @@ void TCPClient::run()
 
 void TCPClient::shutdown()
 {
+    if(!running_)
+    {
+        return; // Уже завершается
+    }
+
     running_ = 0;
     std::cout << "[client] Завершение работы клиента...\n";
 
@@ -121,6 +148,8 @@ void TCPClient::signalHandler(int signum)
     {
         g_client_instance->running_ = 0;
         std::cout << "\n[client] Получен сигнал завершения, закрываю соединения...\n";
+        // Принудительно завершаем работу
+        g_client_instance->shutdown();
     }
 }
 
@@ -189,7 +218,26 @@ void TCPClient::restartConnection(int fd)
     else
     {
         std::cerr << "[error] Не удалось пересоздать соединение\n";
-        // Если не удается создать соединение, возможно сервер недоступен
+        // Если не удается создать соединение, проверяем доступность сервера
+        int test_fd = SocketManager::createClientSocket(config_.host, config_.port);
+        if(test_fd != -1)
+        {
+            // Проверяем статус подключения
+            int err = 0;
+            socklen_t len = sizeof(err);
+            if(getsockopt(test_fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
+            {
+                if(err == ECONNREFUSED)
+                {
+                    std::cerr << "[error] Сервер недоступен. Завершение работы клиента.\n";
+                    SocketManager::closeSocket(test_fd);
+                    running_ = 0;
+                    return;
+                }
+            }
+            SocketManager::closeSocket(test_fd);
+        }
+
         // Проверяем, есть ли еще активные соединения
         if(connections_.empty())
         {
@@ -211,8 +259,12 @@ void TCPClient::handleEpollEvents()
     {
         if(errno == EINTR)
         {
-            // Прервано сигналом - это нормально
-            return;
+            // Прервано сигналом - проверяем, нужно ли завершить работу
+            if(!running_)
+            {
+                return; // Выходим из цикла, shutdown() будет вызван в run()
+            }
+            return; // Продолжаем работу, если running_ еще установлен
         }
         std::perror("epoll_wait");
         running_ = 0;
@@ -270,6 +322,13 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
     // Если сокет готов к записи, отправляем данные
     if(events & EPOLLOUT)
     {
+        // Дополнительная проверка состояния соединения перед отправкой
+        if(conn.connecting)
+        {
+            // Соединение еще не установлено, пропускаем отправку
+            return;
+        }
+
         // Статический буфер с нулями для отправки
         static constexpr char data[1024] = {};
 

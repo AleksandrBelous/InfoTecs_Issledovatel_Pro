@@ -80,6 +80,11 @@ void TCPServer::run()
 
 void TCPServer::shutdown()
 {
+    if(!running_)
+    {
+        return; // Уже завершается
+    }
+
     running_ = 0;
     std::cout << "[server] Завершение работы сервера...\n";
 
@@ -95,6 +100,7 @@ void TCPServer::shutdown()
     // Закрываем epoll и серверный сокет
     if(server_fd_ >= 0)
     {
+        (void)epoll_manager_->removeFileDescriptor(server_fd_);
         SocketManager::closeSocket(server_fd_);
         server_fd_ = -1;
     }
@@ -115,6 +121,8 @@ void TCPServer::signalHandler(int signum)
     {
         g_server_instance->running_ = 0;
         std::cout << "\n[server] Получен сигнал завершения, закрываю соединения...\n";
+        // Принудительно завершаем работу
+        g_server_instance->shutdown();
     }
 }
 
@@ -221,7 +229,7 @@ void TCPServer::handleEpollEvents()
             {
                 return; // Выходим из цикла, shutdown() будет вызван в run()
             }
-            return;
+            return; // Продолжаем работу, если running_ еще установлен
         }
         std::perror("epoll_wait");
         return;
