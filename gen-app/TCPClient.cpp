@@ -178,7 +178,6 @@ bool TCPClient::startConnection(Connection& conn)
         }
     }
 
-
     // Генерируем случайное количество байт для отправки (32-1024 байта)
     std::uniform_int_distribution<size_t> dist(32, 1024);
     conn.fd = fd;
