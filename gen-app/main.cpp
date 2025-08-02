@@ -4,6 +4,7 @@
 #include "ServerConfig.h"
 #include "TCPClient.h"
 #include "ClientConfig.h"
+#include "LogManager.h"
 #include <iostream>
 #include <cstdlib>
 #include <string>
@@ -60,11 +61,14 @@ bool parseAddress(const std::string& addr, ServerConfig& config)
  * @param mode Режим server | client
  * @param server_config Конфигурация для сервера
  * @param client_config Конфигурация для клиента
+ * @param enable_logging Флаг включения логирования
  * @return true при успешном разборе
  */
 bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& server_config,
-                      ClientConfig& client_config)
+                      ClientConfig& client_config, bool& enable_logging)
 {
+    enable_logging = false;
+    
     for(int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
@@ -72,7 +76,7 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
         if(arg == "--help" || arg == "-h")
         {
             std::cout << "Использование: " << argv[0] <<
-                " --addr host:port --mode server|client [--connections N --seed S]\n";
+                " --addr host:port --mode server|client [--connections N --seed S --log]\n";
             std::cout << "\nОпции:\n";
             std::cout << "  --addr host:port    Адрес и порт сервера (обязательно)\n";
             std::cout << "  --mode server|client Режим работы (обязательно)\n";
@@ -80,10 +84,12 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
                 "  --connections N     Количество параллельных соединений (только для клиента, по умолчанию 1)\n";
             std::cout <<
                 "  --seed S            Зерно для генератора случайных чисел (только для клиента, по умолчанию 1)\n";
+            std::cout << "  --log               Включить логирование в файлы logs/log_server.txt и logs/log_client.txt\n";
             std::cout << "  --help, -h          Показать эту справку\n";
             std::cout << "\nПримеры:\n";
             std::cout << "  " << argv[0] << " --addr localhost:8000 --mode server\n";
             std::cout << "  " << argv[0] << " --addr localhost:8000 --mode client --connections 512 --seed 1337\n";
+            std::cout << "  " << argv[0] << " --addr localhost:8000 --mode server --log\n";
             return false; // Завершаем программу после вывода справки
         }
         else if(arg == "--addr" && i + 1 < argc)
@@ -116,6 +122,10 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
         {
             client_config.seed = static_cast<uint32_t>(std::stoul(argv[++i]));
         }
+        else if(arg == "--log")
+        {
+            enable_logging = true;
+        }
         else
         {
             std::cerr << "[error] Неизвестный аргумент: " << arg << "\n";
@@ -142,12 +152,16 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
 /**
  * @brief Запуск сервера
  * @param config Конфигурация сервера
+ * @param enable_logging Включить ли логирование
  * @return Код возврата
  */
-int runServer(const ServerConfig& config)
+int runServer(const ServerConfig& config, bool enable_logging)
 {
     try
     {
+        // Инициализируем систему логирования
+        LogManager::initialize(enable_logging, "server");
+        
         // Создаем и инициализируем сервер
         TCPServer server(config);
 
@@ -172,12 +186,16 @@ int runServer(const ServerConfig& config)
 /**
  * @brief Запуск клиента
  * @param config Конфигурация клиента
+ * @param enable_logging Включить ли логирование
  * @return Код возврата
  */
-int runClient(const ClientConfig& config)
+int runClient(const ClientConfig& config, bool enable_logging)
 {
     try
     {
+        // Инициализируем систему логирования
+        LogManager::initialize(enable_logging, "client");
+        
         // Создаем и инициализируем клиент
         TCPClient client(config);
 
@@ -212,9 +230,10 @@ int main(int argc, char* argv[])
     ServerConfig sconfig;
     ClientConfig cconfig;
     std::string mode;
+    bool enable_logging;
 
     // Разбираем аргументы командной строки
-    if(!parseCommandLine(argc, argv, mode, sconfig, cconfig))
+    if(!parseCommandLine(argc, argv, mode, sconfig, cconfig, enable_logging))
     {
         return EXIT_FAILURE; // Завершаем программу после вывода справки
     }
@@ -222,7 +241,7 @@ int main(int argc, char* argv[])
     // Запускаем сервер или клиент
     if(mode == "server")
     {
-        return runServer(sconfig);
+        return runServer(sconfig, enable_logging);
     }
-    return runClient(cconfig);
+    return runClient(cconfig, enable_logging);
 }

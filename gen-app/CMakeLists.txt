@@ -5,6 +5,8 @@ add_executable(gen-app
         SocketManager.cpp
         EpollManager.cpp
         TCPClient.cpp
+        Logger.cpp
+        LogManager.cpp
 )
 
 # Привязка библиотек
