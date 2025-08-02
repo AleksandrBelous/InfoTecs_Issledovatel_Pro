@@ -1,9 +1,9 @@
 #pragma once
 
 #include "ServerConfig.h"
-#include <set>
-#include <csignal>
 #include <memory>
+#include <unordered_set>
+#include <csignal>
 
 // Предварительные объявления
 class EpollManager;
@@ -103,7 +103,7 @@ private:
 
     ServerConfig config_; ///< Конфигурация сервера
     std::unique_ptr<EpollManager> epoll_manager_; ///< Менеджер epoll
-    std::set<int> client_fds_; ///< Активные клиентские соединения
+    std::unordered_set<int> client_fds_; ///< Активные клиентские соединения
     volatile sig_atomic_t running_ = 1; ///< Флаг работы сервера
     int server_fd_ = -1; ///< Файловый дескриптор серверного сокета
 };

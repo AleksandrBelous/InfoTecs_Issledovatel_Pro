@@ -1,10 +1,10 @@
 // main.cpp — универсальное клиент/серверное приложение
 
-#include "TCPServer.h"
-#include "ServerConfig.h"
-#include "TCPClient.h"
-#include "ClientConfig.h"
-#include "LogManager.h"
+#include "server/TCPServer.h"
+#include "server/ServerConfig.h"
+#include "client/TCPClient.h"
+#include "client/ClientConfig.h"
+#include "logging/LogManager.h"
 #include <iostream>
 #include <cstdlib>
 #include <string>

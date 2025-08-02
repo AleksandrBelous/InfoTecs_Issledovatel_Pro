@@ -1,16 +1,26 @@
-add_executable(gen-app
-        main.cpp
-        ServerConfig.cpp
-        TCPServer.cpp
-        SocketManager.cpp
-        EpollManager.cpp
-        TCPClient.cpp
-        Logger.cpp
-        LogManager.cpp
-)
+# Добавляем поддиректории
+add_subdirectory(server)
+add_subdirectory(client)
+add_subdirectory(network)
+add_subdirectory(logging)
+
+# Основной исполняемый файл
+add_executable(gen-app main.cpp)
 
 # Привязка библиотек
-target_link_libraries(gen-app PRIVATE pthread)
+target_link_libraries(gen-app PRIVATE
+        pthread
+        server_lib
+        client_lib
+        network_lib
+        logging_lib
+)
 
 # Включение директорий для заголовочных файлов
-target_include_directories(gen-app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(gen-app PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/server
+        ${CMAKE_CURRENT_SOURCE_DIR}/client
+        ${CMAKE_CURRENT_SOURCE_DIR}/network
+        ${CMAKE_CURRENT_SOURCE_DIR}/logging
+)

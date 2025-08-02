@@ -1,7 +1,7 @@
 #include "TCPServer.h"
-#include "SocketManager.h"
-#include "EpollManager.h"
-#include "LogMacros.h"
+#include "../network/SocketManager.h"
+#include "../network/EpollManager.h"
+#include "../logging/LogMacros.h"
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
