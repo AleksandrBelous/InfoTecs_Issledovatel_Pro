@@ -6,7 +6,7 @@ add_library(client_lib
 # Привязка зависимостей
 target_link_libraries(client_lib PRIVATE
         network_lib
-        logging_lib
+        logging_lib_gen
 )
 
 # Включение директорий для заголовочных файлов

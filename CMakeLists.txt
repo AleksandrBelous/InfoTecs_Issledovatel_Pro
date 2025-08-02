@@ -11,6 +11,17 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clan
     add_compile_options(-O2 -Wall -Wextra -pedantic)
 endif ()
 
+# Настройка путей для выходных файлов
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
 # Подкаталоги с отдельными программами
 add_subdirectory(gen-app)
 add_subdirectory(sniffer)
+
+# Вывод информации о проектах
+message(STATUS "Building projects:")
+message(STATUS "  - gen-app (TCP client/server application)")
+message(STATUS "  - sniffer (Network packet analyzer)")
+message(STATUS "Output directory: ${CMAKE_BINARY_DIR}/bin")

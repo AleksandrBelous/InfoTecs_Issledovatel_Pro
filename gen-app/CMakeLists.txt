@@ -13,7 +13,7 @@ target_link_libraries(gen-app PRIVATE
         server_lib
         client_lib
         network_lib
-        logging_lib
+        logging_lib_gen
 )
 
 # Включение директорий для заголовочных файлов
