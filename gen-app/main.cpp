@@ -68,7 +68,7 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
                       ClientConfig& client_config, bool& enable_logging)
 {
     enable_logging = false;
-    
+
     for(int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
@@ -84,7 +84,8 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
                 "  --connections N     Количество параллельных соединений (только для клиента, по умолчанию 1)\n";
             std::cout <<
                 "  --seed S            Зерно для генератора случайных чисел (только для клиента, по умолчанию 1)\n";
-            std::cout << "  --log               Включить логирование в файлы logs/log_server.txt и logs/log_client.txt\n";
+            std::cout <<
+                "  --log               Включить логирование в файлы logs/log_[server|client]_YYYYMMDD_HHMMSS_mmm.txt\n";
             std::cout << "  --help, -h          Показать эту справку\n";
             std::cout << "\nПримеры:\n";
             std::cout << "  " << argv[0] << " --addr localhost:8000 --mode server\n";
@@ -161,7 +162,7 @@ int runServer(const ServerConfig& config, bool enable_logging)
     {
         // Инициализируем систему логирования
         LogManager::initialize(enable_logging, "server");
-        
+
         // Создаем и инициализируем сервер
         TCPServer server(config);
 
@@ -195,7 +196,7 @@ int runClient(const ClientConfig& config, bool enable_logging)
     {
         // Инициализируем систему логирования
         LogManager::initialize(enable_logging, "client");
-        
+
         // Создаем и инициализируем клиент
         TCPClient client(config);
 

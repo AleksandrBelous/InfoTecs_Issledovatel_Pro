@@ -16,8 +16,8 @@ Logger::Logger(const std::string& log_file_path, const std::string& component_na
         std::filesystem::create_directories(log_dir);
     }
 
-    // Открываем файл для записи
-    log_file_.open(log_file_path, std::ios::app);
+    // Открываем файл для записи (перезаписываем старый файл)
+    log_file_.open(log_file_path, std::ios::trunc);
     if(log_file_.is_open())
     {
         enabled_ = true;
@@ -74,7 +74,7 @@ void Logger::log_stop(const std::string& function_name)
     ss << std::put_time(std::localtime(&time_t), "%H:%M:%S");
     ss << '.' << std::setfill('0') << std::setw(3) << ms.count();
 
-    log_file_ << "[" << ss.str() << "] " << indent << "stop " << function_name << std::endl;
+    log_file_ << "[" << ss.str() << "] " << indent << "stop  " << function_name << std::endl;
     log_file_.flush();
 }
 
@@ -98,5 +98,5 @@ void Logger::log_message(const std::string& message)
 
 std::string Logger::get_indent() const
 {
-    return std::string(indent_level_ * 2, ' ');
+    return std::string(indent_level_ * 4, ' ');
 }

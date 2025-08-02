@@ -94,11 +94,6 @@ void TCPServer::run()
 void TCPServer::shutdown()
 {
     LOG_FUNCTION();
-    if(!running_)
-    {
-        LOG_MESSAGE("Already shutting down, skipping");
-        return; // Уже завершается
-    }
 
     running_ = 0;
     std::cout << "[server] Завершение работы сервера...\n";
@@ -142,7 +137,7 @@ void TCPServer::signalHandler(int signum)
         g_server_instance->running_ = 0;
         std::cout << "\n[server] Получен сигнал завершения, закрываю соединения...\n";
         // Принудительно завершаем работу
-        g_server_instance->shutdown();
+        // g_server_instance->shutdown();
     }
     else
     {
