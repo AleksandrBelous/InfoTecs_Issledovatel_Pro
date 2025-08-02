@@ -21,6 +21,7 @@ TCPServer::TCPServer(ServerConfig config)
 
 TCPServer::~TCPServer()
 {
+    std::cout << "In ~TCPServer\n";
     if(!running_)
     {
         return; // Уже завершается
@@ -80,11 +81,7 @@ void TCPServer::run()
 
 void TCPServer::shutdown()
 {
-    if(!running_)
-    {
-        return; // Уже завершается
-    }
-
+    std::cout << "In shutdown()\n";
     running_ = 0;
     std::cout << "[server] Завершение работы сервера...\n";
 
@@ -115,6 +112,7 @@ size_t TCPServer::getActiveConnections() const noexcept
 
 void TCPServer::signalHandler(int signum)
 {
+    std::cout << "In signalHandler()\n";
     (void)signum; // Подавляем предупреждение о неиспользуемом параметре
 
     if(g_server_instance)
@@ -122,7 +120,7 @@ void TCPServer::signalHandler(int signum)
         g_server_instance->running_ = 0;
         std::cout << "\n[server] Получен сигнал завершения, закрываю соединения...\n";
         // Принудительно завершаем работу
-        g_server_instance->shutdown();
+        // g_server_instance->shutdown();
     }
 }
 
@@ -227,7 +225,7 @@ void TCPServer::handleEpollEvents()
             // Прервано сигналом - проверяем, нужно ли завершить работу
             if(!running_)
             {
-                return; // Выходим из цикла, shutdown() будет вызван в run()
+                return; // Выходим из цикла, возвращаемся в run() и переходим к shutdown()
             }
             return; // Продолжаем работу, если running_ еще установлен
         }
