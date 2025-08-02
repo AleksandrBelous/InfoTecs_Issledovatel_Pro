@@ -20,8 +20,18 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 add_subdirectory(gen-app)
 add_subdirectory(sniffer)
 
+# Подкаталог с тестами (опционально)
+option(BUILD_TESTS "Build unit tests" ON)
+if (BUILD_TESTS)
+    add_subdirectory(tests)
+    message(STATUS "  - tests (Unit tests with Google Test)")
+endif ()
+
 # Вывод информации о проектах
 message(STATUS "Building projects:")
 message(STATUS "  - gen-app (TCP client/server application)")
 message(STATUS "  - sniffer (Network packet analyzer)")
+if (BUILD_TESTS)
+    message(STATUS "  - tests (Unit tests)")
+endif ()
 message(STATUS "Output directory: ${CMAKE_BINARY_DIR}/bin")
