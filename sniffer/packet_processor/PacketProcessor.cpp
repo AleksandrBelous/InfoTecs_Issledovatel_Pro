@@ -134,6 +134,9 @@ void PacketProcessor::processPacket(const struct pcap_pkthdr* header, const u_ch
 void PacketProcessor::packetLoop()
 {
     std::cout << "[info] Начало захвата пакетов...\n";
+    
+    int packet_count = 0;
+    int processed_count = 0;
 
     while(m_running.load())
     {
@@ -142,14 +145,24 @@ void PacketProcessor::packetLoop()
 
         if(packet)
         {
+            packet_count++;
+            // std::cout << "[debug] Получено пакетов: " << packet_count << "\n";
+            
             processPacket(&header, packet);
+            processed_count++;
         }
         else if(pcap_geterr(m_pcap_handle))
         {
             std::cerr << "[error] Ошибка при захвате пакета: " << pcap_geterr(m_pcap_handle) << "\n";
             break;
         }
+        else
+        {
+            // Нет пакетов, небольшая задержка
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
     }
 
-    std::cout << "[info] Захват пакетов остановлен\n";
+    std::cout << "[info] Захват пакетов остановлен. Всего получено: " << packet_count 
+              << ", обработано: " << processed_count << "\n";
 }

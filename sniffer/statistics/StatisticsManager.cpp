@@ -36,27 +36,32 @@ void StatisticsManager::printTopFlows(size_t count)
     // Заголовок
     std::cout << "=== ТОП-" << count << " TCP потоков по скорости передачи данных ===\n";
     std::cout << std::string(80, '=') << "\n";
-    std::cout << std::left << std::setw(15) << "Источник"
-        << std::setw(8) << "Порт"
-        << std::setw(15) << "Назначение"
-        << std::setw(8) << "Порт"
-        << std::setw(12) << "Скорость"
-        << std::setw(10) << "Ср.размер"
-        << std::setw(10) << "Байт"
-        << std::setw(8) << "Пакеты" << "\n";
+    
+    // Заголовки с правильными ширинами полей
+    std::cout << std::left 
+              << std::setw(16) << "Source"
+              << std::setw(8) << "Port"
+              << std::setw(16) << "Destination"
+              << std::setw(8) << "Port"
+              << std::setw(12) << "Speed"
+              << std::setw(10) << "AvgSize"
+              << std::setw(10) << "Bytes"
+              << std::setw(8) << "Packets" << "\n";
+    
     std::cout << std::string(80, '-') << "\n";
 
-    // Вывод потоков
+    // Вывод потоков с теми же ширинами полей
     for(const auto& flow : top_flows)
     {
-        std::cout << std::left << std::setw(15) << flow.src_ip_str
-            << std::setw(8) << flow.src_port
-            << std::setw(15) << flow.dst_ip_str
-            << std::setw(8) << flow.dst_port
-            << std::setw(12) << formatSpeed(flow.average_speed)
-            << std::setw(10) << std::fixed << std::setprecision(1) << flow.average_packet_size
-            << std::setw(10) << flow.total_bytes
-            << std::setw(8) << flow.packet_count << "\n";
+        std::cout << std::left 
+                  << std::setw(16) << flow.src_ip_str
+                  << std::setw(8) << flow.src_port
+                  << std::setw(16) << flow.dst_ip_str
+                  << std::setw(8) << flow.dst_port
+                  << std::setw(12) << formatSpeed(flow.average_speed)
+                  << std::setw(10) << std::fixed << std::setprecision(1) << flow.average_packet_size
+                  << std::setw(10) << flow.total_bytes
+                  << std::setw(8) << flow.packet_count << "\n";
     }
 
     std::cout << std::string(80, '=') << "\n";

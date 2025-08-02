@@ -44,9 +44,21 @@ std::unique_ptr<PacketInfo> PacketParser::parsePacket(const u_char* packet, uint
 
 bool PacketParser::isTcpIpv4Packet(const u_char* packet, uint32_t packet_size)
 {
+    static int total_checked = 0;
+    static int size_failed = 0;
+    static int ether_type_failed = 0;
+    static int protocol_failed = 0;
+
+    total_checked++;
+
     // Проверяем минимальный размер
     if(packet_size < sizeof(struct ether_header) + sizeof(struct iphdr))
     {
+        size_failed++;
+        if(size_failed % 100 == 0)
+        {
+            std::cout << "[debug] Проверок размера пакета: " << size_failed << "/" << total_checked << "\n";
+        }
         return false;
     }
 
@@ -55,12 +67,32 @@ bool PacketParser::isTcpIpv4Packet(const u_char* packet, uint32_t packet_size)
     uint16_t ether_type = ntohs(eth_header->ether_type);
     if(ether_type != ETHERTYPE_IP)
     {
+        ether_type_failed++;
+        if(ether_type_failed % 50 == 0)
+        {
+            // std::cout << "[debug] Неверный тип Ethernet: " << std::hex << ether_type
+            //     << " (ожидалось: " << ETHERTYPE_IP << "), всего: " << ether_type_failed << "/" << total_checked << "\n";
+
+            // Дополнительная отладочная информация для первых нескольких пакетов
+            if(ether_type_failed <= 3)
+            {
+                // std::cout << "[debug] Первые 16 байт пакета: ";
+                // for(uint32_t i = 0; i < 16 && i < packet_size; i++)
+                // {
+                //     std::cout << std::hex << (int)packet[i] << " ";
+                // }
+                // std::cout << std::dec << "\n";
+
+                // std::cout << "[debug] Ethernet тип: " << std::hex << ether_type << std::dec << "\n";
+                // std::cout << "[debug] Размер пакета: " << packet_size << "\n";
+            }
+        }
         return false;
     }
 
     // Проверяем версию IP (IPv4 = 4)
     const struct iphdr* ip_header = reinterpret_cast<const struct iphdr*>(packet + sizeof(struct ether_header));
-    if((ip_header->version & 0xF0) != 0x40) // IPv4
+    if(ip_header->version != 4)
     {
         return false;
     }
@@ -68,6 +100,12 @@ bool PacketParser::isTcpIpv4Packet(const u_char* packet, uint32_t packet_size)
     // Проверяем протокол (TCP = 6)
     if(ip_header->protocol != IPPROTO_TCP)
     {
+        protocol_failed++;
+        if(protocol_failed % 50 == 0)
+        {
+            // std::cout << "[debug] Неверный протокол: " << (int)ip_header->protocol
+            //     << " (ожидалось: " << IPPROTO_TCP << "), всего: " << protocol_failed << "/" << total_checked << "\n";
+        }
         return false;
     }
 
