@@ -13,3 +13,4 @@ endif ()
 
 # Подкаталоги с отдельными программами
 add_subdirectory(gen-app)
+add_subdirectory(sniffer)
