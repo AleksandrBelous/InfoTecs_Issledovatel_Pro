@@ -10,6 +10,7 @@
 #include <cerrno>
 #include <cstring>
 #include <ranges>
+#include <fcntl.h>
 
 // Глобальный указатель на клиент для обработчика сигналов
 static TCPClient* g_client_instance = nullptr;
@@ -32,6 +33,96 @@ TCPClient::~TCPClient()
     }
 }
 
+bool TCPClient::checkServerAvailability() const
+{
+    LOG_FUNCTION();
+    LOG_MESSAGE("Checking server availability at " + config_.host + ":" + std::to_string(config_.port));
+
+    int test_fd = SocketManager::createClientSocket(config_.host, config_.port);
+    if(test_fd == -1)
+    {
+        LOG_MESSAGE("Server unavailable: cannot create test socket");
+        return false;
+    }
+
+    // Проверяем статус подключения
+    int err = 0;
+    socklen_t len = sizeof(err);
+    if(getsockopt(test_fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
+    {
+        LOG_MESSAGE("Server connection test failed: " + std::string(strerror(err)));
+        SocketManager::closeSocket(test_fd);
+        return false;
+    }
+
+    // Для неблокирующего сокета нужно дождаться завершения подключения
+    // Используем epoll для ожидания события EPOLLOUT
+    int epoll_fd = epoll_create1(0);
+    if(epoll_fd == -1)
+    {
+        LOG_MESSAGE("Failed to create epoll for connection test");
+        SocketManager::closeSocket(test_fd);
+        return false;
+    }
+
+    struct epoll_event event{};
+    event.events = EPOLLOUT | EPOLLERR;
+    event.data.fd = test_fd;
+
+    if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, test_fd, &event) == -1)
+    {
+        LOG_MESSAGE("Failed to add socket to epoll for connection test");
+        close(epoll_fd);
+        SocketManager::closeSocket(test_fd);
+        return false;
+    }
+
+    // Ждем завершения подключения с таймаутом
+    struct epoll_event events[1];
+    int num_events = epoll_wait(epoll_fd, events, 1, 5000); // 5 секунд таймаут
+
+    close(epoll_fd);
+
+    if(num_events == -1)
+    {
+        LOG_MESSAGE("epoll_wait failed during connection test");
+        SocketManager::closeSocket(test_fd);
+        return false;
+    }
+
+    if(num_events == 0)
+    {
+        LOG_MESSAGE("Connection test timeout");
+        SocketManager::closeSocket(test_fd);
+        return false;
+    }
+
+    // Проверяем, что подключение успешно установлено
+    if(getsockopt(test_fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
+    {
+        LOG_MESSAGE("Connection failed after epoll wait: " + std::string(strerror(err)));
+        SocketManager::closeSocket(test_fd);
+        return false;
+    }
+
+    SocketManager::closeSocket(test_fd);
+    LOG_MESSAGE("Server availability check passed");
+    return true;
+}
+
+void TCPClient::handleServerUnavailable(const std::string& context)
+{
+    LOG_MESSAGE("Server unavailable: " + context);
+    std::cerr << "[error] Сервер недоступен: " << config_.host << ":" << config_.port << "\n";
+    std::cerr << "[error] Контекст: " << context << "\n";
+
+    if(connections_.empty())
+    {
+        std::cerr << "[error] Нет активных соединений. Завершение работы клиента.\n";
+        running_ = 0;
+    }
+}
+
 bool TCPClient::initialize()
 {
     LOG_FUNCTION();
@@ -48,30 +139,11 @@ bool TCPClient::initialize()
     signal(SIGINT, signalHandler);
 
     // Проверяем доступность сервера перед созданием соединений
-    LOG_MESSAGE("Checking server availability at " + config_.host + ":" + std::to_string(config_.port));
-    int test_fd = SocketManager::createClientSocket(config_.host, config_.port);
-    if(test_fd == -1)
+    if(!checkServerAvailability())
     {
-        LOG_MESSAGE("Server unavailable: cannot create test socket");
-        std::cerr << "[error] Сервер недоступен: " << config_.host << ":" << config_.port << "\n";
+        handleServerUnavailable("при инициализации клиента");
         return false;
     }
-
-    // Проверяем статус подключения
-    int err = 0;
-    socklen_t len = sizeof(err);
-    if(getsockopt(test_fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
-    {
-        if(err == ECONNREFUSED)
-        {
-            LOG_MESSAGE("Server refused connection");
-            std::cerr << "[error] Сервер недоступен: " << config_.host << ":" << config_.port << "\n";
-            SocketManager::closeSocket(test_fd);
-            return false;
-        }
-    }
-    SocketManager::closeSocket(test_fd);
-    LOG_MESSAGE("Server availability check passed");
 
     // Создаем начальные соединения
     LOG_MESSAGE("Creating " + std::to_string(config_.connections) + " initial connections");
@@ -149,7 +221,7 @@ std::string TCPClient::getStats() const
     size_t total_bytes_to_send = 0;
     size_t total_bytes_sent = 0;
 
-    for(const auto& [fd, conn] : connections_)
+    for(const auto& conn : connections_ | std::views::values)
     {
         total_bytes_to_send += conn.total_bytes;
         total_bytes_sent += conn.bytes_sent;
@@ -189,25 +261,26 @@ bool TCPClient::startConnection(Connection& conn)
     if(fd == -1)
     {
         LOG_MESSAGE("Failed to create client socket");
-        std::cerr << "[error] Не удалось создать сокет для подключения к "
-            << config_.host << ":" << config_.port << "\n";
+        total_failures_++;
         return false;
     }
 
-    // Если не удается создать соединение, проверяем доступность сервера
     // Проверяем статус подключения
     int err = 0;
     socklen_t len = sizeof(err);
     if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
     {
-        if(err == ECONNREFUSED)
+        LOG_MESSAGE("Connection error during startConnection: " + std::string(strerror(err)));
+        SocketManager::closeSocket(fd);
+        total_failures_++;
+
+        // Если это первичное подключение или слишком много неудач
+        if(connections_.empty() || total_failures_ >= MAX_TOTAL_FAILURES)
         {
-            LOG_MESSAGE("Server refused connection during startConnection");
-            std::cerr << "[error] Сервер недоступен. Завершение работы клиента.\n";
-            SocketManager::closeSocket(fd);
-            running_ = 0;
+            handleServerUnavailable("при создании соединения");
             return false;
         }
+        return false;
     }
 
     // Генерируем случайное количество байт для отправки (32-1024 байта)
@@ -216,6 +289,7 @@ bool TCPClient::startConnection(Connection& conn)
     conn.total_bytes = dist(rng_);
     conn.bytes_sent = 0;
     conn.is_connecting = true;
+    conn.reconnect_attempts = 0;
 
     // Добавляем сокет в epoll для отслеживания событий подключения и записи
     if(!epoll_manager_->addFileDescriptor(fd, EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLRDHUP))
@@ -223,6 +297,7 @@ bool TCPClient::startConnection(Connection& conn)
         LOG_MESSAGE("Failed to add socket fd=" + std::to_string(fd) + " to epoll");
         std::cerr << "[error] Не удалось добавить сокет в epoll: fd=" << fd << "\n";
         SocketManager::closeSocket(fd);
+        total_failures_++;
         return false;
     }
 
@@ -257,10 +332,39 @@ void TCPClient::restartConnection(int fd)
         return;
     }
 
+    // Увеличиваем счетчик попыток переподключения
+    it->second.reconnect_attempts++;
+
     std::cout << "[client] Закрыто соединение: fd=" << fd << '\n';
     (void)epoll_manager_->removeFileDescriptor(fd);
     SocketManager::closeSocket(fd);
     connections_.erase(it);
+
+    // Проверяем, не превышено ли количество попыток переподключения
+    if(it->second.reconnect_attempts >= MAX_RECONNECT_ATTEMPTS)
+    {
+        LOG_MESSAGE("Max reconnection attempts reached for connection fd=" + std::to_string(fd));
+        std::cerr << "[error] Превышено максимальное количество попыток переподключения\n";
+
+        // Проверяем доступность сервера
+        if(!checkServerAvailability())
+        {
+            handleServerUnavailable("при переподключении");
+            return;
+        }
+
+        // Сбрасываем счетчик неудач, если сервер снова доступен
+        total_failures_ = 0;
+    }
+
+    // Если общее количество неудач превысило лимит, завершаем работу
+    if(total_failures_ >= MAX_TOTAL_FAILURES)
+    {
+        LOG_MESSAGE("Total failures limit reached: " + std::to_string(total_failures_));
+        std::cerr << "[error] Превышено максимальное количество неудачных попыток подключения\n";
+        handleServerUnavailable("превышен лимит неудачных попыток");
+        return;
+    }
 
     // Создаем новое соединение для поддержания постоянного количества
     Connection conn;
@@ -274,26 +378,6 @@ void TCPClient::restartConnection(int fd)
     {
         LOG_MESSAGE("Failed to recreate connection");
         std::cerr << "[error] Не удалось пересоздать соединение\n";
-        // Если не удается создать соединение, проверяем доступность сервера
-        int test_fd = SocketManager::createClientSocket(config_.host, config_.port);
-        if(test_fd != -1)
-        {
-            // Проверяем статус подключения
-            int err = 0;
-            socklen_t len = sizeof(err);
-            if(getsockopt(test_fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0)
-            {
-                if(err == ECONNREFUSED)
-                {
-                    LOG_MESSAGE("Server unavailable during restart, shutting down");
-                    std::cerr << "[error] Сервер недоступен. Завершение работы клиента.\n";
-                    SocketManager::closeSocket(test_fd);
-                    running_ = 0;
-                    return;
-                }
-            }
-            SocketManager::closeSocket(test_fd);
-        }
 
         // Проверяем, есть ли еще активные соединения
         if(connections_.empty())
@@ -375,13 +459,22 @@ void TCPClient::handleConnectionEvent(int fd, uint32_t events)
         {
             LOG_MESSAGE("Connection error for fd=" + std::to_string(fd) + ": " + strerror(err));
             std::cerr << "[error] Ошибка подключения (fd=" << fd << "): " << strerror(err) << "\n";
-            if(err == ECONNREFUSED)
+            total_failures_++;
+
+            // Если это первичное подключение или слишком много неудач
+            if(connections_.size() == 1 || total_failures_ >= MAX_TOTAL_FAILURES)
             {
-                LOG_MESSAGE("Server refused connection, shutting down");
-                std::cerr << "[error] Сервер недоступен. Завершение работы клиента.\n";
-                running_ = 0;
+                handleServerUnavailable("при установке соединения");
                 return;
             }
+
+            // Если все соединения не удалось установить, завершаем работу
+            if(connections_.empty())
+            {
+                handleServerUnavailable("не удалось установить ни одного соединения");
+                return;
+            }
+
             restartConnection(fd);
             return;
         }

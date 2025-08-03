@@ -88,6 +88,7 @@ private:
         size_t total_bytes = 0; ///< Общее количество байт для отправки
         size_t bytes_sent = 0; ///< Количество уже отправленных байт
         bool is_connecting = true; ///< Флаг процесса подключения
+        int reconnect_attempts = 0; ///< Количество попыток переподключения
     };
 
     /**
@@ -95,6 +96,12 @@ private:
      * @param signum Номер сигнала
      */
     static void signalHandler(int signum);
+
+    /**
+     * @brief Проверка доступности сервера
+     * @return true если сервер доступен
+     */
+    bool checkServerAvailability() const;
 
     /**
      * @brief Создание нового соединения
@@ -126,10 +133,19 @@ private:
      */
     void checkConnectionCount();
 
+    /**
+     * @brief Обработка недоступности сервера
+     * @param context Контекст ошибки для логирования
+     */
+    void handleServerUnavailable(const std::string& context);
+
     ClientConfig config_; ///< Конфигурация клиента
     std::unique_ptr<EpollManager> epoll_manager_; ///< Менеджер epoll
     std::unordered_map<int, Connection> connections_; ///< Активные соединения
     std::mt19937 rng_; ///< Генератор случайных чисел
     size_t last_connection_count_ = 0; ///< Последнее выведенное количество соединений
     volatile sig_atomic_t running_ = 1; ///< Флаг работы клиента
+    static constexpr int MAX_RECONNECT_ATTEMPTS = 3; ///< Максимальное количество попыток переподключения
+    static constexpr int MAX_TOTAL_FAILURES = 10; ///< Максимальное общее количество неудач
+    int total_failures_ = 0; ///< Общее количество неудачных попыток подключения
 };
