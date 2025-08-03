@@ -12,7 +12,7 @@ StatisticsManager::StatisticsManager()
 }
 
 void StatisticsManager::updateFlowStats(const FlowTuple& flow_tuple, uint32_t packet_size,
-                                        uint32_t payload_size, uint64_t timestamp)
+                                        uint32_t payload_size, uint64_t timestamp) const
 {
     if(m_flow_tracker)
     {
@@ -20,7 +20,7 @@ void StatisticsManager::updateFlowStats(const FlowTuple& flow_tuple, uint32_t pa
     }
 }
 
-void StatisticsManager::printTopFlows(size_t count)
+void StatisticsManager::printTopFlows(size_t count) const
 {
     auto top_flows = getTopFlows(count);
 
@@ -36,32 +36,32 @@ void StatisticsManager::printTopFlows(size_t count)
     // Заголовок
     std::cout << "=== ТОП-" << count << " TCP потоков по скорости передачи данных ===\n";
     std::cout << std::string(80, '=') << "\n";
-    
+
     // Заголовки с правильными ширинами полей
-    std::cout << std::left 
-              << std::setw(16) << "Source"
-              << std::setw(8) << "Port"
-              << std::setw(16) << "Destination"
-              << std::setw(8) << "Port"
-              << std::setw(12) << "Speed"
-              << std::setw(10) << "AvgSize"
-              << std::setw(10) << "Bytes"
-              << std::setw(8) << "Packets" << "\n";
-    
+    std::cout << std::left
+        << std::setw(16) << "Source"
+        << std::setw(8) << "Port"
+        << std::setw(16) << "Destination"
+        << std::setw(8) << "Port"
+        << std::setw(12) << "Speed"
+        << std::setw(10) << "AvgSize"
+        << std::setw(10) << "Bytes"
+        << std::setw(8) << "Packets" << "\n";
+
     std::cout << std::string(80, '-') << "\n";
 
     // Вывод потоков с теми же ширинами полей
     for(const auto& flow : top_flows)
     {
-        std::cout << std::left 
-                  << std::setw(16) << flow.src_ip_str
-                  << std::setw(8) << flow.src_port
-                  << std::setw(16) << flow.dst_ip_str
-                  << std::setw(8) << flow.dst_port
-                  << std::setw(12) << formatSpeed(flow.average_speed)
-                  << std::setw(10) << std::fixed << std::setprecision(1) << flow.average_packet_size
-                  << std::setw(10) << flow.total_bytes
-                  << std::setw(8) << flow.packet_count << "\n";
+        std::cout << std::left
+            << std::setw(16) << flow.src_ip_str
+            << std::setw(8) << flow.src_port
+            << std::setw(16) << flow.dst_ip_str
+            << std::setw(8) << flow.dst_port
+            << std::setw(12) << formatSpeed(flow.average_speed)
+            << std::setw(10) << std::fixed << std::setprecision(1) << flow.average_packet_size
+            << std::setw(10) << flow.total_bytes
+            << std::setw(8) << flow.packet_count << "\n";
     }
 
     std::cout << std::string(80, '=') << "\n";
@@ -89,7 +89,7 @@ void StatisticsManager::cleanupOldFlows()
     }
 }
 
-std::vector<TopFlowInfo> StatisticsManager::getTopFlows(size_t count)
+std::vector<TopFlowInfo> StatisticsManager::getTopFlows(size_t count) const
 {
     std::vector<TopFlowInfo> top_flows;
 

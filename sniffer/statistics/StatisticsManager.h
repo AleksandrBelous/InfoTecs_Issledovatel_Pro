@@ -47,13 +47,13 @@ public:
      * @param timestamp Временная метка пакета
      */
     void updateFlowStats(const FlowTuple& flow_tuple, uint32_t packet_size,
-                         uint32_t payload_size, uint64_t timestamp);
+                         uint32_t payload_size, uint64_t timestamp) const;
 
     /**
      * @brief Вывод топ-N потоков по скорости передачи данных
      * @param count Количество потоков для вывода
      */
-    void printTopFlows(size_t count);
+    void printTopFlows(size_t count) const;
 
     /**
      * @brief Установка трекера потоков
@@ -72,14 +72,14 @@ private:
      * @param count Количество потоков
      * @return Вектор топ-потоков
      */
-    std::vector<TopFlowInfo> getTopFlows(size_t count);
+    [[nodiscard]] std::vector<TopFlowInfo> getTopFlows(size_t count) const;
 
     /**
      * @brief Форматирование скорости для вывода
      * @param speed Скорость в байтах в секунду
      * @return Отформатированная строка
      */
-    std::string formatSpeed(double speed);
+    static std::string formatSpeed(double speed);
 
     FlowTracker* m_flow_tracker;
     uint64_t m_last_cleanup_time;
