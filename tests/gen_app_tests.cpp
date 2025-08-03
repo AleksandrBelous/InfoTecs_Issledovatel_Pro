@@ -352,7 +352,7 @@ TEST_F(PerformanceTest, EpollManagerPerformance)
     // Очистка
     for(int fd : fds)
     {
-        epoll_manager->removeFileDescriptor(fd);
+        EXPECT_TRUE(epoll_manager->removeFileDescriptor(fd));
         close(fd);
     }
 
