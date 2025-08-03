@@ -55,7 +55,7 @@ cmake --build build
 
 ```bash
 # Запуск клиента с 512 параллельными соединениями
-./gen-app --addr localhost:8000 --mode client --connections 512 --seed 1337
+./gen-app --addr localhost:12345 --mode client --connections 512 --seed 1337
 ```
 
 ### Параметры командной строки
@@ -169,7 +169,7 @@ cmake --build build
    ./gen-app --addr localhost:12345 --mode client --connections 512 --seed 42
    ```
 
-4. Наблюдайте за статистикой в sniffer
+4. Наблюдайте за статистикой в sniffer, например:
 
 ````
 === ТОП-10 TCP потоков по скорости передачи данных ===
