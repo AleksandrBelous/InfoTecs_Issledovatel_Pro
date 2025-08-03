@@ -23,7 +23,7 @@ public:
      * @param flow_tracker Ссылка на трекер потоков
      * @param stats_manager Ссылка на менеджер статистики
      */
-    PacketProcessor(const std::string& interface, FlowTracker& flow_tracker, StatisticsManager& stats_manager);
+    PacketProcessor(std::string interface, FlowTracker& flow_tracker, StatisticsManager& stats_manager);
 
     /**
      * @brief Деструктор
@@ -44,7 +44,7 @@ public:
      * @brief Проверка активности
      * @return true если процессор активен
      */
-    bool isRunning() const { return m_running.load(); }
+    [[nodiscard]] bool isRunning() const { return m_running.load(); }
 
 private:
     /**
@@ -58,12 +58,12 @@ private:
      * @param header Заголовок пакета
      * @param packet Данные пакета
      */
-    void processPacket(const struct pcap_pkthdr* header, const u_char* packet);
+    void processPacket(const pcap_pkthdr* header, const u_char* packet) const;
 
     /**
      * @brief Основной цикл обработки пакетов
      */
-    void packetLoop();
+    void packetLoop() const;
 
     std::string m_interface;
     FlowTracker& m_flow_tracker;

@@ -2,6 +2,8 @@
 #include <arpa/inet.h>
 #include <cstring>
 #include <iostream>
+#include <netinet/tcp.h>
+#include <net/ethernet.h>
 
 std::unique_ptr<PacketInfo> PacketParser::parsePacket(const u_char* packet, uint32_t packet_size, uint64_t timestamp)
 {
@@ -18,10 +20,10 @@ std::unique_ptr<PacketInfo> PacketParser::parsePacket(const u_char* packet, uint
 
         // Вычисляем размеры
         uint32_t ethernet_size = sizeof(struct ether_header);
-        const struct iphdr* ip_header = reinterpret_cast<const struct iphdr*>(packet + ethernet_size);
+        const auto* ip_header = reinterpret_cast<const struct iphdr*>(packet + ethernet_size);
         uint32_t ip_header_size = (ip_header->ihl & 0x0F) * 4;
 
-        const struct tcphdr* tcp_header = reinterpret_cast<const struct tcphdr*>(
+        const auto* tcp_header = reinterpret_cast<const struct tcphdr*>(
             packet + ethernet_size + ip_header_size);
         uint32_t tcp_header_size = ((tcp_header->doff & 0xF0) >> 4) * 4;
 
@@ -63,7 +65,7 @@ bool PacketParser::isTcpIpv4Packet(const u_char* packet, uint32_t packet_size)
     }
 
     // Проверяем тип Ethernet кадра (IPv4 = 0x0800)
-    const struct ether_header* eth_header = reinterpret_cast<const struct ether_header*>(packet);
+    const auto* eth_header = reinterpret_cast<const struct ether_header*>(packet);
     uint16_t ether_type = ntohs(eth_header->ether_type);
     if(ether_type != ETHERTYPE_IP)
     {
@@ -91,7 +93,7 @@ bool PacketParser::isTcpIpv4Packet(const u_char* packet, uint32_t packet_size)
     }
 
     // Проверяем версию IP (IPv4 = 4)
-    const struct iphdr* ip_header = reinterpret_cast<const struct iphdr*>(packet + sizeof(struct ether_header));
+    const auto* ip_header = reinterpret_cast<const struct iphdr*>(packet + sizeof(struct ether_header));
     if(ip_header->version != 4)
     {
         return false;
@@ -114,7 +116,7 @@ bool PacketParser::isTcpIpv4Packet(const u_char* packet, uint32_t packet_size)
 
 std::string PacketParser::ipToString(uint32_t ip)
 {
-    struct in_addr addr;
+    struct in_addr addr{};
     addr.s_addr = ip;
     return inet_ntoa(addr);
 }
@@ -123,7 +125,7 @@ FlowTuple PacketParser::extractFlowTuple(const u_char* packet, uint32_t packet_s
 {
     (void)packet_size; // Подавляем предупреждение о неиспользуемом параметре
     // Пропускаем Ethernet заголовок
-    const struct iphdr* ip_header = reinterpret_cast<const struct iphdr*>(
+    const auto* ip_header = reinterpret_cast<const struct iphdr*>(
         packet + sizeof(struct ether_header));
 
     // Получаем IP адреса
@@ -132,14 +134,14 @@ FlowTuple PacketParser::extractFlowTuple(const u_char* packet, uint32_t packet_s
 
     // Вычисляем смещение к TCP заголовку
     uint32_t ip_header_size = (ip_header->ihl & 0x0F) * 4;
-    const struct tcphdr* tcp_header = reinterpret_cast<const struct tcphdr*>(
+    const auto* tcp_header = reinterpret_cast<const struct tcphdr*>(
         packet + sizeof(struct ether_header) + ip_header_size);
 
     // Получаем порты
     uint16_t src_port = ntohs(tcp_header->source);
     uint16_t dst_port = ntohs(tcp_header->dest);
 
-    FlowTuple flow_tuple;
+    FlowTuple flow_tuple{};
     flow_tuple.src_ip = src_ip;
     flow_tuple.dst_ip = dst_ip;
     flow_tuple.src_port = src_port;

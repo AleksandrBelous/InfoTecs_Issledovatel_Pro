@@ -2,8 +2,6 @@
 #define FLOW_STATS_H
 
 #include "../packet_processor/PacketParser.h"
-#include <cstdint>
-#include <string>
 
 /**
  * @brief Класс для хранения статистики потока
@@ -28,32 +26,32 @@ public:
      * @brief Получение среднего размера пакета
      * @return Средний размер пакета в байтах
      */
-    double getAveragePacketSize() const;
+    [[nodiscard]] double getAveragePacketSize() const;
 
     /**
      * @brief Получение общего количества переданных байт
      * @return Общее количество байт в полезной нагрузке
      */
-    uint64_t getTotalBytes() const { return total_bytes; }
+    [[nodiscard]] uint64_t getTotalBytes() const { return total_bytes; }
 
     /**
      * @brief Получение количества пакетов
      * @return Количество пакетов в потоке
      */
-    uint64_t getPacketCount() const { return m_packet_count; }
+    [[nodiscard]] uint64_t getPacketCount() const { return m_packet_count; }
 
     /**
      * @brief Получение средней скорости передачи данных
      * @param current_time Текущее время в микросекундах
      * @return Скорость в байтах в секунду
      */
-    double getAverageSpeed(uint64_t current_time) const;
+    [[nodiscard]] double getAverageSpeed(uint64_t current_time) const;
 
     /**
      * @brief Получение времени последнего пакета
      * @return Временная метка последнего пакета
      */
-    uint64_t getLastPacketTime() const { return m_last_packet_time; }
+    [[nodiscard]] uint64_t getLastPacketTime() const { return m_last_packet_time; }
 
     /**
      * @brief Сброс статистики

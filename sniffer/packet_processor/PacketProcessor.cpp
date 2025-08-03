@@ -6,9 +6,9 @@
 #include <cstring>
 #include <chrono>
 
-PacketProcessor::PacketProcessor(const std::string& interface, FlowTracker& flow_tracker,
+PacketProcessor::PacketProcessor(std::string interface, FlowTracker& flow_tracker,
                                  StatisticsManager& stats_manager)
-    : m_interface(interface)
+    : m_interface(std::move(interface))
       , m_flow_tracker(flow_tracker)
       , m_stats_manager(stats_manager)
       , m_pcap_handle(nullptr)
@@ -74,7 +74,7 @@ bool PacketProcessor::initializePcap()
     }
 
     // Установка фильтра для TCP/IP пакетов
-    struct bpf_program fp;
+    struct bpf_program fp{};
     const char* filter_exp = "tcp and ip";
 
     if(pcap_compile(m_pcap_handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1)
@@ -97,7 +97,7 @@ bool PacketProcessor::initializePcap()
     return true;
 }
 
-void PacketProcessor::processPacket(const struct pcap_pkthdr* header, const u_char* packet)
+void PacketProcessor::processPacket(const pcap_pkthdr* header, const u_char* packet) const
 {
     try
     {
@@ -111,7 +111,7 @@ void PacketProcessor::processPacket(const struct pcap_pkthdr* header, const u_ch
         uint64_t timestamp = static_cast<uint64_t>(header->ts.tv_sec) * 1000000 +
             static_cast<uint64_t>(header->ts.tv_usec);
 
-        auto packet_info = m_packet_parser.parsePacket(packet, header->len, timestamp);
+        auto packet_info = PacketParser::parsePacket(packet, header->len, timestamp);
         if(!packet_info)
         {
             return;
@@ -131,23 +131,22 @@ void PacketProcessor::processPacket(const struct pcap_pkthdr* header, const u_ch
     }
 }
 
-void PacketProcessor::packetLoop()
+void PacketProcessor::packetLoop() const
 {
     std::cout << "[info] Начало захвата пакетов...\n";
-    
+
     int packet_count = 0;
     int processed_count = 0;
 
     while(m_running.load())
     {
-        struct pcap_pkthdr header;
-        const u_char* packet = pcap_next(m_pcap_handle, &header);
+        pcap_pkthdr header{};
 
-        if(packet)
+        if(const u_char* packet = pcap_next(m_pcap_handle, &header))
         {
             packet_count++;
             // std::cout << "[debug] Получено пакетов: " << packet_count << "\n";
-            
+
             processPacket(&header, packet);
             processed_count++;
         }
@@ -163,6 +162,6 @@ void PacketProcessor::packetLoop()
         }
     }
 
-    std::cout << "[info] Захват пакетов остановлен. Всего получено: " << packet_count 
-              << ", обработано: " << processed_count << "\n";
+    std::cout << "[info] Захват пакетов остановлен. Всего получено: " << packet_count
+        << ", обработано: " << processed_count << "\n";
 }

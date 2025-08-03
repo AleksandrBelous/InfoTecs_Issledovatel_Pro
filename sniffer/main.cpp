@@ -5,15 +5,15 @@
 #include "statistics/StatisticsManager.h"
 #include "logging/LogManager.h"
 #include <iostream>
-#include <cstdlib>
 #include <string>
-#include <signal.h>
+#include <csignal>
 #include <chrono>
 #include <thread>
+#include <memory>
 
 // Глобальные переменные для корректного завершения
 static bool g_running = true;
-static PacketProcessor* g_packet_processor = nullptr;
+static std::unique_ptr<PacketProcessor> g_packet_processor = nullptr;
 
 /**
  * @brief Обработчик сигнала для корректного завершения
@@ -107,14 +107,14 @@ int runSniffer(const std::string& interface, bool enable_logging)
         FlowTracker flow_tracker;
         StatisticsManager stats_manager;
         stats_manager.setFlowTracker(flow_tracker);
-        PacketProcessor packet_processor(interface, flow_tracker, stats_manager);
-
-        g_packet_processor = &packet_processor;
+        
+        // Создаем PacketProcessor и сохраняем в глобальную переменную
+        g_packet_processor = std::make_unique<PacketProcessor>(interface, flow_tracker, stats_manager);
 
         // Запуск обработки пакетов в отдельном потоке
-        std::thread packet_thread([&packet_processor]()
+        std::thread packet_thread([&]()
         {
-            packet_processor.start();
+            g_packet_processor->start();
         });
 
         // Основной цикл вывода статистики
@@ -122,15 +122,12 @@ int runSniffer(const std::string& interface, bool enable_logging)
         {
             std::this_thread::sleep_for(std::chrono::seconds(1));
 
-            if(g_running)
-            {
-                stats_manager.cleanupOldFlows();
-                stats_manager.printTopFlows(10);
-            }
+            stats_manager.cleanupOldFlows();
+            stats_manager.printTopFlows(10);
         }
 
         // Остановка и ожидание завершения
-        packet_processor.stop();
+        g_packet_processor->stop();
         if(packet_thread.joinable())
         {
             packet_thread.join();

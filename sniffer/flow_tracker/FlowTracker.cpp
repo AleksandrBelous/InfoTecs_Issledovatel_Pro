@@ -1,10 +1,7 @@
 #include "FlowTracker.h"
 #include <chrono>
-#include <iostream>
 
-FlowTracker::FlowTracker()
-{
-}
+FlowTracker::FlowTracker() = default;
 
 void FlowTracker::updateFlow(const FlowTuple& flow_tuple, uint32_t packet_size,
                              uint32_t payload_size, uint64_t timestamp)

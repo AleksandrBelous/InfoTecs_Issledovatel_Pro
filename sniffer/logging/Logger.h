@@ -2,8 +2,6 @@
 
 #include <string>
 #include <fstream>
-#include <iostream>
-#include <memory>
 
 /**
  * @brief Класс для логирования с отслеживанием стека вызовов
@@ -16,7 +14,7 @@ public:
      * @param log_file_path Путь к файлу лога
      * @param component_name Имя компонента (server/client)
      */
-    Logger(const std::string& log_file_path, const std::string& component_name);
+    Logger(const std::string& log_file_path, std::string component_name);
 
     /**
      * @brief Деструктор

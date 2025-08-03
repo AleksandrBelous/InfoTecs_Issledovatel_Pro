@@ -1,5 +1,4 @@
 #include "FlowStats.h"
-#include <algorithm>
 
 FlowStats::FlowStats()
     : total_bytes(0)
@@ -29,7 +28,7 @@ double FlowStats::getAveragePacketSize() const
     {
         return 0.0;
     }
-    return static_cast<double>(m_total_packet_size) / m_packet_count;
+    return static_cast<double>(m_total_packet_size) / static_cast<double>(m_packet_count);
 }
 
 double FlowStats::getAverageSpeed(uint64_t current_time) const

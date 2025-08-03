@@ -3,9 +3,10 @@
 #include <iomanip>
 #include <sstream>
 #include <filesystem>
+#include <iostream>
 
-Logger::Logger(const std::string& log_file_path, const std::string& component_name)
-    : component_name_(component_name)
+Logger::Logger(const std::string& log_file_path, std::string component_name)
+    : component_name_(std::move(component_name))
       , enabled_(false)
       , indent_level_(0)
 {
@@ -98,5 +99,5 @@ void Logger::log_message(const std::string& message)
 
 std::string Logger::get_indent() const
 {
-    return std::string(indent_level_ * 4, ' ');
+    return std::string(static_cast<size_t>(indent_level_) * 4, ' ');
 }

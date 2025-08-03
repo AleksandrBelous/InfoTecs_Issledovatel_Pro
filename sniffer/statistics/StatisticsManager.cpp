@@ -35,7 +35,7 @@ void StatisticsManager::printTopFlows(size_t count) const
 
     // Заголовок
     std::cout << "=== ТОП-" << count << " TCP потоков по скорости передачи данных ===\n";
-    std::cout << std::string(80, '=') << "\n";
+    std::cout << std::string(88, '=') << "\n";
 
     // Заголовки с правильными ширинами полей
     std::cout << std::left
@@ -48,7 +48,7 @@ void StatisticsManager::printTopFlows(size_t count) const
         << std::setw(10) << "Bytes"
         << std::setw(8) << "Packets" << "\n";
 
-    std::cout << std::string(80, '-') << "\n";
+    std::cout << std::string(88, '-') << "\n";
 
     // Вывод потоков с теми же ширинами полей
     for(const auto& flow : top_flows)
@@ -64,7 +64,7 @@ void StatisticsManager::printTopFlows(size_t count) const
             << std::setw(8) << flow.packet_count << "\n";
     }
 
-    std::cout << std::string(80, '=') << "\n";
+    std::cout << std::string(88, '=') << "\n";
     std::cout << "Всего активных потоков: " << (m_flow_tracker ? m_flow_tracker->getActiveFlowCount() : 0) << "\n";
     std::cout << "Для завершения работы используйте Ctrl-C\n\n";
 }
@@ -123,11 +123,11 @@ std::vector<TopFlowInfo> StatisticsManager::getTopFlows(size_t count) const
     }
 
     // Сортируем по скорости (убывание)
-    std::sort(top_flows.begin(), top_flows.end(),
-              [](const TopFlowInfo& a, const TopFlowInfo& b)
-              {
-                  return a.average_speed > b.average_speed;
-              });
+    std::ranges::sort(top_flows,
+                      [](const TopFlowInfo& a, const TopFlowInfo& b)
+                      {
+                          return a.average_speed > b.average_speed;
+                      });
 
     // Возвращаем топ-N
     if(top_flows.size() > count)

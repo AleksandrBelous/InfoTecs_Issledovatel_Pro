@@ -1,12 +1,10 @@
 #ifndef PACKET_PARSER_H
 #define PACKET_PARSER_H
 
-#include <cstdint>
 #include <string>
 #include <memory>
 #include <netinet/ip.h>
-#include <netinet/tcp.h>
-#include <net/ethernet.h>
+
 
 /**
  * @brief Структура для хранения 4-tuple потока
@@ -73,7 +71,7 @@ public:
      * @param timestamp Временная метка пакета
      * @return Информация о пакете или nullptr если парсинг не удался
      */
-    std::unique_ptr<PacketInfo> parsePacket(const u_char* packet, uint32_t packet_size, uint64_t timestamp);
+    static std::unique_ptr<PacketInfo> parsePacket(const u_char* packet, uint32_t packet_size, uint64_t timestamp);
 
     /**
      * @brief Проверка является ли пакет TCP/IPv4
@@ -97,7 +95,7 @@ private:
      * @param packet_size Размер пакета
      * @return 4-tuple потока
      */
-    FlowTuple extractFlowTuple(const u_char* packet, uint32_t packet_size);
+    static FlowTuple extractFlowTuple(const u_char* packet, uint32_t packet_size);
 };
 
 #endif // PACKET_PARSER_H
