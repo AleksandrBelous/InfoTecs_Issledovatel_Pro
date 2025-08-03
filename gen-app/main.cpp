@@ -68,6 +68,7 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
                       ClientConfig& client_config, bool& enable_logging)
 {
     enable_logging = false;
+    bool mode_set = false;
 
     for(int i = 1; i < argc; ++i)
     {
@@ -93,7 +94,7 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
             std::cout << "  " << argv[0] << " --addr localhost:8000 --mode server --log\n";
             return false; // Завершаем программу после вывода справки
         }
-        else if(arg == "--addr" && i + 1 < argc)
+        if(arg == "--addr" && i + 1 < argc)
         {
             if(!parseAddress(argv[++i], server_config))
             {
@@ -105,6 +106,7 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
         else if(arg == "--mode" && i + 1 < argc)
         {
             mode = argv[++i];
+            mode_set = true;
             if(mode != "server" && mode != "client")
             {
                 std::cerr << "[error] Поддерживаются режимы server или client\n";
@@ -113,6 +115,11 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
         }
         else if(arg == "--connections" && i + 1 < argc)
         {
+            if(mode_set && mode == "server")
+            {
+                std::cerr << "[error] Аргумент --connections не поддерживается для сервера\n";
+                return false;
+            }
             client_config.connections = std::stoul(argv[++i]);
             if(client_config.connections == 0)
             {
@@ -121,6 +128,11 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
         }
         else if(arg == "--seed" && i + 1 < argc)
         {
+            if(mode_set && mode == "server")
+            {
+                std::cerr << "[error] Аргумент --seed не поддерживается для сервера\n";
+                return false;
+            }
             client_config.seed = static_cast<uint32_t>(std::stoul(argv[++i]));
         }
         else if(arg == "--log")
@@ -138,6 +150,12 @@ bool parseCommandLine(int argc, char* argv[], std::string& mode, ServerConfig& s
     if(!server_config.isValid())
     {
         std::cerr << "[error] Необходимо указать адрес и порт: --addr host:port\n";
+        return false;
+    }
+
+    if(!mode_set)
+    {
+        std::cerr << "[error] Необходимо указать режим работы: --mode server|client\n";
         return false;
     }
 
