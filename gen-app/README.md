@@ -180,22 +180,3 @@ gen-app/
 
 **Примечание:** Проект собирается из корневой директории. Корневой `CMakeLists.txt` определяет общие настройки (C++20,
 флаги компиляции), а gen-app, sniffer и tests собираются как подпроекты.
-
-## Сборка и запуск
-
-````bash
-# Сборка из корневой директории проекта
-rm -rf build && mkdir build && cd build
-cmake ..
-make
-````
-
-````bash
-# Запуск сервера
-./bin/gen-app --addr localhost:8000 --mode server
-````
-
-````bash
-# Запуск клиента
-./bin/gen-app --addr localhost:8000 --mode client --connections 512 --seed 1337
-````
